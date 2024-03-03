@@ -12,10 +12,19 @@
 
 using namespace std;
 
+enum Transitions
+{
+    TRANS_TO_READY,
+    TRANS_TO_PREEMPT,
+    TRANS_TO_RUN,
+    TRANS_TO_BLOCK
+};
+
 class Process
 {
 public:
     int at, tc, cb, io;
+    int state_ts;
 
     Process(string args)
     {
@@ -222,21 +231,44 @@ public:
     }
 };
 
-class Event {
-
+class Event
+{
+public:
+    Process *process;
+    int timestamp;
+    Transitions transition;
 };
 
-class DES_Layer {
+class DES_Layer
+{
 private:
-    deque<Event*> eventQ;
+    deque<Event *> eventQ;
+
+public:
+    Event *get_event()
+    {
+        return new Event();
+    }
+
+    int get_next_event_time()
+    {
+        return 0;
+    }
 };
 
 /**
  * Global variables
  */
 
-int randvals[100000]; // variable to store random numbers
-vector<Process> processes;
+int randvals[100000];      // a list of random numbers
+vector<Process> processes; // a list of processes
+
+int CURRENT_TIME = 0;
+bool CALL_SCHEDULER = false;
+Scheduler *SCHEDULER = nullptr;
+Process *CURRENT_RUNNING_PROCESS = nullptr;
+DES_Layer DESPATCHER;
+
 int ofs = 0; // offset
 
 /**
@@ -272,6 +304,10 @@ int myrandom(int burst)
     return 1 + (randvals[ofs] % burst);
 }
 
+/**
+ * Print error message for incorrect input arguments
+ * @param - filename - executable file's name
+ */
 void print_usage(char *filename)
 {
     printf("Usage: %s [-v] [-t] [-e] [-p] [-i] [-s sched] inputfile randomfile\n"
@@ -340,6 +376,10 @@ Scheduler *getScheduler(char *args)
     }
 }
 
+/**
+ * Parse the numbers from the random-number file
+ * @param - filename - random-number file
+ */
 void parse_randoms(char *filename)
 {
     fstream rand_file;
@@ -359,6 +399,10 @@ void parse_randoms(char *filename)
     }
 }
 
+/**
+ * Parse the process information from the input file
+ * @param - filename - input file
+ */
 void parse_input(char *filename)
 {
     fstream input_file;
@@ -379,6 +423,55 @@ void parse_input(char *filename)
     }
 }
 
+/**
+ * Start simulation
+ */
+void Simulation()
+{
+    Event *evt;
+    while ((evt = DESPATCHER.get_event()))
+    {
+        Process *proc = evt->process; // this is the process the event works on
+        CURRENT_TIME = evt->timestamp;
+        int transition = evt->transition;
+        int timeInPrevState = CURRENT_TIME - proc->state_ts; // for accounting
+        delete evt;
+        evt = nullptr; // remove cur event obj and don’t touch anymore
+        switch (transition)
+        { // encodes where we come from and where we go
+        case TRANS_TO_READY:
+            // must come from BLOCKED or CREATED
+            // add to run queue, no event created
+            CALL_SCHEDULER = true;
+            break;
+        case TRANS_TO_PREEMPT: // similar to TRANS_TO_READY // must come from RUNNING (preemption)
+            // add to runqueue (no event is generated)
+            CALL_SCHEDULER = true;
+            break;
+        case TRANS_TO_RUN:
+            // create event for either preemption or blocking
+            break;
+        case TRANS_TO_BLOCK:
+            // create an event for when process becomes READY again
+            CALL_SCHEDULER = true;
+            break;
+        }
+        if (CALL_SCHEDULER)
+        {
+            if (DESPATCHER.get_next_event_time() == CURRENT_TIME)
+                continue;           // process next event from Event queue
+            CALL_SCHEDULER = false; // reset global flag
+            if (CURRENT_RUNNING_PROCESS == nullptr)
+            {
+                CURRENT_RUNNING_PROCESS = SCHEDULER->get_next_process();
+                if (CURRENT_RUNNING_PROCESS == nullptr)
+                    continue;
+                // create event to make this process runnable for same time.
+            }
+        }
+    }
+}
+
 int main(int argc, char **argv)
 {
     bool verbose = false;
@@ -386,8 +479,6 @@ int main(int argc, char **argv)
     bool event_trace = false;
     bool preemption_trace = false;
     bool single_step = false;
-
-    Scheduler *scheduler = nullptr;
 
     int option;
     while ((option = getopt(argc, argv, "vtepis:")) != -1)
@@ -411,7 +502,7 @@ int main(int argc, char **argv)
             break;
         case 's':
         {
-            scheduler = getScheduler(optarg);
+            SCHEDULER = getScheduler(optarg);
             break;
         }
         default:
@@ -440,10 +531,10 @@ int main(int argc, char **argv)
         cout << p.at << " " << p.tc << " " << p.cb << " " << p.io << endl;
     }
 
-    if (!scheduler)
+    if (!SCHEDULER)
     {
-        scheduler = new FCFSScheduler();
+        SCHEDULER = new FCFSScheduler();
     }
 
-    printf("%s\n", scheduler->to_string().c_str());
+    printf("%s\n", SCHEDULER->to_string().c_str());
 }
