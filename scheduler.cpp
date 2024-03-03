@@ -540,26 +540,33 @@ void read_arguments(int argc, char **argv)
         printf("Not a valid random file <(null)>\n");
         exit(1);
     }
-}
-
-int main(int argc, char **argv)
-{
-    read_arguments(argc, argv);
 
     if (!SCHEDULER)
     {
         SCHEDULER = new FCFSScheduler();
     }
+}
 
+/**
+ * Print the scheduling output in the format expected for grading
+ */
+void print_output()
+{
     printf("%s\n", SCHEDULER->to_string().c_str());
-
-    parse_randoms(argv[optind + 1]);
-    parse_input(argv[optind]);
 
     for (Process *p : PROCESSES)
     {
         printf("%04d: %4d %4d %4d %4d |\n", p->get_pid(), p->arrival_time, p->total_cpu_time, p->cpu_burst, p->io_burst);
     }
+}
+
+int main(int argc, char **argv)
+{
+    read_arguments(argc, argv);
+    parse_randoms(argv[optind + 1]);
+    parse_input(argv[optind]);
 
     DESPATCHER = new DES_Layer;
+
+    print_output();
 }
