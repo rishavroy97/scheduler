@@ -6,45 +6,43 @@
 
 #include <iostream>
 #include <fstream>
+#include <vector>
+#include <deque>
 #include <tuple>
 
 using namespace std;
 
-/**
- * Helper functions
- */
-
-bool hasChar(const char *str, char ch)
-{
-    while (*str != '\0')
-    {
-        if (*str == ch)
-        {
-            return true;
-        }
-        str++;
-    }
-    return false;
-}
-
-// int myrandom(int burst)
-// {
-//     return 1 + (randvals[ofs] % burst);
-// }
-
-void print_usage(char *filename)
-{
-    printf("Usage: %s [-v] [-t] [-e] [-p] [-i] [-s sched] inputfile randomfile\n"
-           "-v enables verbose\n"
-           "-t enables scheduler details\n"
-           "-e enables event tracing\n"
-           "-p enables E scheduler preempton tracing\n"
-           "-i single steps event by event\n",
-           filename);
-}
-
 class Process
 {
+public:
+    int at, tc, cb, io;
+
+    Process(string args)
+    {
+        char *buffer = new char[args.length() + 1];
+        vector<int> nums;
+        strcpy(buffer, args.c_str());
+
+        char delims[] = " \t\n";
+
+        char *token = strtok(buffer, delims);
+        int num = stoi(token);
+        nums.push_back(num);
+
+        while (token != nullptr)
+        {
+            token = strtok(nullptr, delims);
+            if (token != nullptr)
+            {
+                num = stoi(token);
+                nums.push_back(num);
+            }
+        }
+        at = nums[0];
+        tc = nums[1];
+        cb = nums[2];
+        io = nums[3];
+    }
 };
 
 class Scheduler
@@ -76,7 +74,7 @@ public:
 
     Process *get_next_process()
     {
-        return new Process;
+        return new Process("");
     }
 
     void print_runq()
@@ -100,7 +98,7 @@ public:
 
     Process *get_next_process()
     {
-        return new Process;
+        return new Process("");
     }
 
     void print_runq()
@@ -124,7 +122,7 @@ public:
 
     Process *get_next_process()
     {
-        return new Process;
+        return new Process("");
     }
 
     void print_runq()
@@ -150,7 +148,7 @@ public:
 
     Process *get_next_process()
     {
-        return new Process;
+        return new Process("");
     }
 
     void print_runq()
@@ -180,7 +178,7 @@ public:
 
     Process *get_next_process()
     {
-        return new Process;
+        return new Process("");
     }
 
     void print_runq()
@@ -210,7 +208,7 @@ public:
 
     Process *get_next_process()
     {
-        return new Process;
+        return new Process("");
     }
 
     void print_runq()
@@ -223,6 +221,67 @@ public:
         return "PREPRIO " + std::to_string(quantum);
     }
 };
+
+class Event {
+
+};
+
+class DES_Layer {
+private:
+    deque<Event*> eventQ;
+};
+
+/**
+ * Global variables
+ */
+
+int randvals[100000]; // variable to store random numbers
+vector<Process> processes;
+int ofs = 0; // offset
+
+/**
+ * Helper functions
+ */
+
+/**
+ * check if a char* string has a character
+ * @param str - actual string
+ * @param ch - character to be searched
+ */
+bool hasChar(const char *str, char ch)
+{
+    while (*str != '\0')
+    {
+        if (*str == ch)
+        {
+            return true;
+        }
+        str++;
+    }
+    return false;
+}
+
+/**
+ * Get random number from randvals
+ * @param - burst - the corresponding CPU or IO burst
+ *
+ * @returns - random value in the range of 1,..,burst
+ */
+int myrandom(int burst)
+{
+    return 1 + (randvals[ofs] % burst);
+}
+
+void print_usage(char *filename)
+{
+    printf("Usage: %s [-v] [-t] [-e] [-p] [-i] [-s sched] inputfile randomfile\n"
+           "-v enables verbose\n"
+           "-t enables scheduler details\n"
+           "-e enables event tracing\n"
+           "-p enables E scheduler preempton tracing\n"
+           "-i single steps event by event\n",
+           filename);
+}
 
 /**
  * Get the appropriate scheduler based on the arguments
@@ -281,33 +340,43 @@ Scheduler *getScheduler(char *args)
     }
 }
 
-void parse_input(char *filename)
+void parse_randoms(char *filename)
 {
-    fstream new_file;
+    fstream rand_file;
+    rand_file.open(filename, ios::in);
 
-    new_file.open(filename, ios::in);
-
-    if (!new_file.is_open())
+    if (!rand_file.is_open())
     {
         printf("Not a valid inputfile <%s>\n", filename);
         exit(1);
     }
 
-    cout << "Input file" << filename << endl;
+    string line;
+    int c = 0;
+    while (getline(rand_file, line))
+    {
+        randvals[c++] = stoi(line);
+    }
 }
 
-void parse_random(char *filename)
+void parse_input(char *filename)
 {
-    fstream new_file;
-    new_file.open(filename, ios::in);
+    fstream input_file;
 
-    if (!new_file.is_open())
+    input_file.open(filename, ios::in);
+
+    if (!input_file.is_open())
     {
         printf("Not a valid inputfile <%s>\n", filename);
         exit(1);
     }
 
-    cout << "Random file" << filename << endl;
+    string line;
+    int c = 0;
+    while (getline(input_file, line))
+    {
+        processes.push_back(Process(line));
+    }
 }
 
 int main(int argc, char **argv)
@@ -363,8 +432,13 @@ int main(int argc, char **argv)
         exit(1);
     }
 
-    parse_random(argv[optind + 1]);
+    parse_randoms(argv[optind + 1]);
     parse_input(argv[optind]);
+
+    for (Process p : processes)
+    {
+        cout << p.at << " " << p.tc << " " << p.cb << " " << p.io << endl;
+    }
 
     if (!scheduler)
     {
