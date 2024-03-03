@@ -54,6 +54,12 @@ protected:
     int max_priority;
 
 public:
+    Scheduler(int q = 10000, int maxprio = 4)
+    {
+        quantum = q;
+        max_priority = maxprio;
+    }
+
     virtual void add_process(Process *p, bool quant) = 0;
     virtual Process *get_next_process() = 0;
     virtual void print_runq() = 0;
@@ -63,11 +69,6 @@ public:
 class FCFSScheduler : public Scheduler
 {
 public:
-    FCFSScheduler()
-    {
-        quantum = 10000;
-    }
-
     void add_process(Process *p, bool quant)
     {
         /*code*/
@@ -92,11 +93,6 @@ public:
 class LCFSScheduler : public Scheduler
 {
 public:
-    LCFSScheduler()
-    {
-        quantum = 10000;
-    }
-
     void add_process(Process *p, bool quant)
     {
         /*code*/
@@ -121,11 +117,6 @@ public:
 class SJFScheduler : public Scheduler
 {
 public:
-    SJFScheduler()
-    {
-        quantum = 10000;
-    }
-
     void add_process(Process *p, bool quant)
     {
         /*code*/
@@ -150,10 +141,7 @@ public:
 class RRScheduler : public Scheduler
 {
 public:
-    RRScheduler(int num)
-    {
-        quantum = num;
-    }
+    RRScheduler(int num) : Scheduler(num) {}
 
     void add_process(Process *p, bool quant)
     {
@@ -179,15 +167,10 @@ public:
 class PriorityScheduler : public Scheduler
 {
 public:
-    PriorityScheduler(int num, int maxprio)
+    PriorityScheduler(int num, int maxprio) : Scheduler(num, maxprio)
     {
-        quantum = num;
-        max_priority = maxprio;
-    }
-
-    PriorityScheduler(int num)
-    {
-        PriorityScheduler(num, 4);
+        if (max_priority <= 0)
+            max_priority = 4;
     }
 
     void add_process(Process *p, bool quant)
@@ -214,15 +197,10 @@ public:
 class PreemptivePriorityScheduler : public Scheduler
 {
 public:
-    PreemptivePriorityScheduler(int num, int maxprio)
+    PreemptivePriorityScheduler(int num, int maxprio) : Scheduler(num, maxprio)
     {
-        quantum = num;
-        max_priority = maxprio;
-    }
-
-    PreemptivePriorityScheduler(int num)
-    {
-        PreemptivePriorityScheduler(num, 4);
+        if (max_priority <= 0)
+            max_priority = 4;
     }
 
     void add_process(Process *p, bool quant)
@@ -254,24 +232,14 @@ public:
  */
 Scheduler *getScheduler(char *args)
 {
-    Scheduler *scheduler;
     switch (args[0])
     {
     case 'F':
-    {
-        scheduler = new FCFSScheduler();
-        break;
-    }
+        return new FCFSScheduler();
     case 'L':
-    {
-        scheduler = new LCFSScheduler();
-        break;
-    }
+        return new LCFSScheduler();
     case 'S':
-    {
-        scheduler = new SJFScheduler();
-        break;
-    }
+        return new SJFScheduler();
     case 'R':
     {
         int quantum;
@@ -281,8 +249,7 @@ Scheduler *getScheduler(char *args)
             printf("Invalid scheduler param <%s>\n", args);
             exit(1);
         }
-        scheduler = new RRScheduler(quantum);
-        break;
+        return new RRScheduler(quantum);
     }
     case 'P':
     {
@@ -294,8 +261,7 @@ Scheduler *getScheduler(char *args)
             printf("Invalid scheduler param <%s>\n", args);
             exit(1);
         }
-        scheduler = (maxprio <= 0) ? new PriorityScheduler(quantum) : new PriorityScheduler(quantum, maxprio);
-        break;
+        return new PriorityScheduler(quantum, maxprio);
     }
     case 'E':
     {
@@ -307,14 +273,12 @@ Scheduler *getScheduler(char *args)
             printf("Invalid scheduler param <%s>\n", args);
             exit(1);
         }
-        scheduler = (maxprio <= 0) ? new PreemptivePriorityScheduler(quantum) : new PreemptivePriorityScheduler(quantum, maxprio);
-        break;
+        return new PreemptivePriorityScheduler(quantum, maxprio);
     }
     default:
         printf("Unknown Scheduler spec: -v {FLSRPE}\n");
         exit(1);
     }
-    return scheduler;
 }
 
 void parse_input(char *filename)
@@ -329,7 +293,7 @@ void parse_input(char *filename)
         exit(1);
     }
 
-    cout<<"Input file"<<filename<<endl;
+    cout << "Input file" << filename << endl;
 }
 
 void parse_random(char *filename)
@@ -343,7 +307,7 @@ void parse_random(char *filename)
         exit(1);
     }
 
-    cout<<"Random file"<<filename<<endl;
+    cout << "Random file" << filename << endl;
 }
 
 int main(int argc, char **argv)
