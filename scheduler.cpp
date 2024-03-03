@@ -22,12 +22,19 @@ enum Transitions
 
 class Process
 {
+private:
+    static int process_count;
+    int pid;
+
 public:
-    int at, tc, cb, io;
+    int arrival_time, total_cpu_time, cpu_burst, io_burst;
     int state_ts;
+    int static_priority;
+    int dynamic_priority;
 
     Process(string args)
     {
+        pid = Process::process_count++;
         char *buffer = new char[args.length() + 1];
         vector<int> nums;
         strcpy(buffer, args.c_str());
@@ -47,10 +54,15 @@ public:
                 nums.push_back(num);
             }
         }
-        at = nums[0];
-        tc = nums[1];
-        cb = nums[2];
-        io = nums[3];
+        arrival_time = nums[0];
+        total_cpu_time = nums[1];
+        cpu_burst = nums[2];
+        io_burst = nums[3];
+    }
+
+    int get_pid()
+    {
+        return pid;
     }
 };
 
@@ -260,14 +272,20 @@ public:
  * Global variables
  */
 
-int randvals[100000];      // a list of random numbers
-vector<Process> processes; // a list of processes
-
-int CURRENT_TIME = 0;
+int RANDVALS[100000];           // initialize a list of random numbers
+vector<Process *> PROCESSES;    // initialize a list of processes
+int Process::process_count = 0; // set process count static data to 0
+int CURRENT_TIME = 0;           // current CPU time
 bool CALL_SCHEDULER = false;
 Scheduler *SCHEDULER = nullptr;
 Process *CURRENT_RUNNING_PROCESS = nullptr;
-DES_Layer DESPATCHER;
+DES_Layer *DESPATCHER = nullptr;
+
+bool VERBOSE = false;
+bool SHOW_SCHED_DETAILS = false;
+bool SHOW_EVENT_TRACE = false;
+bool SHOW_PREEMPTION_TRACE = false;
+bool SHOW_SINGLE_STEP = false;
 
 int ofs = 0; // offset
 
@@ -301,7 +319,7 @@ bool hasChar(const char *str, char ch)
  */
 int myrandom(int burst)
 {
-    return 1 + (randvals[ofs] % burst);
+    return 1 + (RANDVALS[ofs] % burst);
 }
 
 /**
@@ -395,7 +413,7 @@ void parse_randoms(char *filename)
     int c = 0;
     while (getline(rand_file, line))
     {
-        randvals[c++] = stoi(line);
+        RANDVALS[c++] = stoi(line);
     }
 }
 
@@ -419,7 +437,7 @@ void parse_input(char *filename)
     int c = 0;
     while (getline(input_file, line))
     {
-        processes.push_back(Process(line));
+        PROCESSES.push_back(new Process(line));
     }
 }
 
@@ -429,7 +447,7 @@ void parse_input(char *filename)
 void Simulation()
 {
     Event *evt;
-    while ((evt = DESPATCHER.get_event()))
+    while ((evt = DESPATCHER->get_event()))
     {
         Process *proc = evt->process; // this is the process the event works on
         CURRENT_TIME = evt->timestamp;
@@ -458,7 +476,7 @@ void Simulation()
         }
         if (CALL_SCHEDULER)
         {
-            if (DESPATCHER.get_next_event_time() == CURRENT_TIME)
+            if (DESPATCHER->get_next_event_time() == CURRENT_TIME)
                 continue;           // process next event from Event queue
             CALL_SCHEDULER = false; // reset global flag
             if (CURRENT_RUNNING_PROCESS == nullptr)
@@ -472,33 +490,33 @@ void Simulation()
     }
 }
 
-int main(int argc, char **argv)
+/**
+ * Read command-line arguments and assign values to global variables
+ *
+ * @param - argc - total argument count
+ * @param - argv - array of arguments
+ */
+void read_arguments(int argc, char **argv)
 {
-    bool verbose = false;
-    bool sched_details = false;
-    bool event_trace = false;
-    bool preemption_trace = false;
-    bool single_step = false;
-
     int option;
     while ((option = getopt(argc, argv, "vtepis:")) != -1)
     {
         switch (option)
         {
         case 'v':
-            verbose = true;
+            VERBOSE = true;
             break;
         case 't':
-            sched_details = true;
+            SHOW_SCHED_DETAILS = true;
             break;
         case 'e':
-            event_trace = true;
+            SHOW_EVENT_TRACE = true;
             break;
         case 'p':
-            preemption_trace = true;
+            SHOW_PREEMPTION_TRACE = true;
             break;
         case 'i':
-            single_step = true;
+            SHOW_SINGLE_STEP = true;
             break;
         case 's':
         {
@@ -522,14 +540,11 @@ int main(int argc, char **argv)
         printf("Not a valid random file <(null)>\n");
         exit(1);
     }
+}
 
-    parse_randoms(argv[optind + 1]);
-    parse_input(argv[optind]);
-
-    for (Process p : processes)
-    {
-        cout << p.at << " " << p.tc << " " << p.cb << " " << p.io << endl;
-    }
+int main(int argc, char **argv)
+{
+    read_arguments(argc, argv);
 
     if (!SCHEDULER)
     {
@@ -537,4 +552,14 @@ int main(int argc, char **argv)
     }
 
     printf("%s\n", SCHEDULER->to_string().c_str());
+
+    parse_randoms(argv[optind + 1]);
+    parse_input(argv[optind]);
+
+    for (Process *p : PROCESSES)
+    {
+        printf("%04d: %4d %4d %4d %4d |\n", p->get_pid(), p->arrival_time, p->total_cpu_time, p->cpu_burst, p->io_burst);
+    }
+
+    DESPATCHER = new DES_Layer;
 }
