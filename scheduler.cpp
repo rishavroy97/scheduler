@@ -434,10 +434,12 @@ void parse_randoms(char *filename)
     }
 
     string line;
-    int c = 0;
-    while (getline(rand_file, line))
+    getline(rand_file, line);
+    int count = stoi(line);
+    for (int i = 0; i < count; i++)
     {
-        RANDVALS[c++] = stoi(line);
+        getline(rand_file, line);
+        RANDVALS[i] = stoi(line);
     }
 }
 
