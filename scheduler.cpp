@@ -20,6 +20,14 @@ enum Transitions
     TRANS_TO_BLOCK
 };
 
+enum Proc_State
+{
+    CREATED,
+    READY,
+    RUNNING,
+    BLOCKED
+};
+
 class Process
 {
 private:
@@ -32,32 +40,15 @@ public:
     int static_priority;
     int dynamic_priority;
 
+    Proc_State state;
+
     Process(string args)
     {
         pid = Process::process_count++;
         char *buffer = new char[args.length() + 1];
-        vector<int> nums;
         strcpy(buffer, args.c_str());
 
-        char delims[] = " \t\n";
-
-        char *token = strtok(buffer, delims);
-        int num = stoi(token);
-        nums.push_back(num);
-
-        while (token != nullptr)
-        {
-            token = strtok(nullptr, delims);
-            if (token != nullptr)
-            {
-                num = stoi(token);
-                nums.push_back(num);
-            }
-        }
-        arrival_time = nums[0];
-        total_cpu_time = nums[1];
-        cpu_burst = nums[2];
-        io_burst = nums[3];
+        sscanf(buffer, "%d %d %d %d", &arrival_time, &total_cpu_time, &cpu_burst, &io_burst);
     }
 
     int get_pid()
@@ -249,6 +240,16 @@ public:
     Process *process;
     int timestamp;
     Transitions transition;
+
+    int start_time;
+    int expiry_time;
+
+    Event(Process *proc)
+    {
+        process = proc;
+        timestamp = proc->arrival_time;
+        transition = TRANS_TO_READY;
+    }
 };
 
 class DES_Layer
@@ -257,14 +258,37 @@ private:
     deque<Event *> eventQ;
 
 public:
+    /**
+     * Add the created processes to the Event Queue
+     */
+    void initialize(vector<Process *> processes)
+    {
+        for (Process *p : processes)
+        {
+            Event *e = new Event(p);
+            e->start_time = p->arrival_time;
+            p->state = CREATED;
+            put_event(e);
+        }
+    }
+
     Event *get_event()
     {
-        return new Event();
+        if (eventQ.empty())
+        {
+            return nullptr;
+        }
+        return eventQ.back();
     }
 
     int get_next_event_time()
     {
         return 0;
+    }
+
+    void put_event(Event *e)
+    {
+        eventQ.push_front(e);
     }
 };
 
@@ -279,7 +303,7 @@ int CURRENT_TIME = 0;           // current CPU time
 bool CALL_SCHEDULER = false;
 Scheduler *SCHEDULER = nullptr;
 Process *CURRENT_RUNNING_PROCESS = nullptr;
-DES_Layer *DESPATCHER = nullptr;
+DES_Layer *DISPATCHER = nullptr;
 
 bool VERBOSE = false;
 bool SHOW_SCHED_DETAILS = false;
@@ -444,14 +468,14 @@ void parse_input(char *filename)
 /**
  * Start simulation
  */
-void Simulation()
+void run_simulation()
 {
     Event *evt;
-    while ((evt = DESPATCHER->get_event()))
+    while ((evt = DISPATCHER->get_event()))
     {
         Process *proc = evt->process; // this is the process the event works on
         CURRENT_TIME = evt->timestamp;
-        int transition = evt->transition;
+        Transitions transition = evt->transition;
         int timeInPrevState = CURRENT_TIME - proc->state_ts; // for accounting
         delete evt;
         evt = nullptr; // remove cur event obj and don’t touch anymore
@@ -476,7 +500,7 @@ void Simulation()
         }
         if (CALL_SCHEDULER)
         {
-            if (DESPATCHER->get_next_event_time() == CURRENT_TIME)
+            if (DISPATCHER->get_next_event_time() == CURRENT_TIME)
                 continue;           // process next event from Event queue
             CALL_SCHEDULER = false; // reset global flag
             if (CURRENT_RUNNING_PROCESS == nullptr)
@@ -566,7 +590,10 @@ int main(int argc, char **argv)
     parse_randoms(argv[optind + 1]);
     parse_input(argv[optind]);
 
-    DESPATCHER = new DES_Layer;
+    DISPATCHER = new DES_Layer();
+    DISPATCHER->initialize(PROCESSES);
+
+    run_simulation();
 
     print_output();
 }
