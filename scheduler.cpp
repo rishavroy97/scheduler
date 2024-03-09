@@ -523,9 +523,10 @@ void run_simulation()
         {
         case TRANS_TO_READY:
         {
-            printf("%d %d %d: %s -> %s\n",
-                   CURRENT_TIME, proc->get_pid(), timeInPrevState,
-                   STATE_STRING[proc->state].c_str(), STATE_STRING[READY].c_str());
+            if (VERBOSE)
+                printf("%d %d %d: %s -> %s\n",
+                       CURRENT_TIME, proc->get_pid(), timeInPrevState,
+                       STATE_STRING[proc->state].c_str(), STATE_STRING[READY].c_str());
             if (proc == CURRENT_BLOCKED_PROCESS)
             {
                 CURRENT_BLOCKED_PROCESS = nullptr;
@@ -539,9 +540,10 @@ void run_simulation()
         }
         case TRANS_TO_PREEMPT:
         {
-            printf("%d %d %d: %s -> %s\n",
-                   CURRENT_TIME, proc->get_pid(), timeInPrevState,
-                   STATE_STRING[proc->state].c_str(), STATE_STRING[PREEMPT].c_str());
+            if (VERBOSE)
+                printf("%d %d %d: %s -> %s\n",
+                       CURRENT_TIME, proc->get_pid(), timeInPrevState,
+                       STATE_STRING[proc->state].c_str(), STATE_STRING[PREEMPT].c_str());
             if (proc == CURRENT_RUNNING_PROCESS)
             {
                 CURRENT_RUNNING_PROCESS = nullptr;
@@ -556,16 +558,18 @@ void run_simulation()
         }
         case TRANS_TO_RUN:
         { // create event for either preemption or blocking
-            printf("%d %d %d: %s -> %s\n",
-                   CURRENT_TIME, proc->get_pid(), timeInPrevState,
-                   STATE_STRING[proc->state].c_str(), STATE_STRING[RUNNING].c_str());
+            if (VERBOSE)
+                printf("%d %d %d: %s -> %s\n",
+                       CURRENT_TIME, proc->get_pid(), timeInPrevState,
+                       STATE_STRING[proc->state].c_str(), STATE_STRING[RUNNING].c_str());
             break;
         }
         case TRANS_TO_BLOCK:
         { // create an event for when process becomes READY again
-            printf("%d %d %d: %s -> %s\n",
-                   CURRENT_TIME, proc->get_pid(), timeInPrevState,
-                   STATE_STRING[proc->state].c_str(), STATE_STRING[BLOCKED].c_str());
+            if (VERBOSE)
+                printf("%d %d %d: %s -> %s\n",
+                       CURRENT_TIME, proc->get_pid(), timeInPrevState,
+                       STATE_STRING[proc->state].c_str(), STATE_STRING[BLOCKED].c_str());
             CALL_SCHEDULER = true;
             break;
         }
