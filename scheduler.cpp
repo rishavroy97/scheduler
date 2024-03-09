@@ -264,11 +264,11 @@ public:
 
 class DES_Layer
 {
-    // private:
+private:
+    deque<Event *> eventQ;
 
 public:
     // TODO: Make member private
-    deque<Event *> eventQ;
     /**
      * Add the created processes to the Event Queue
      */
@@ -667,9 +667,5 @@ int main(int argc, char **argv)
     DISPATCHER->initialize(PROCESSES);
     run_simulation();
 
-    for (Event *e : DISPATCHER->eventQ)
-    {
-        cout << e->process->get_pid() << "\t" << e->timestamp << endl;
-    }
     print_output();
 }
