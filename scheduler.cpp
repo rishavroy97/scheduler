@@ -139,15 +139,37 @@ public:
 
 class SRTFcheduler : public Scheduler
 {
+private:
+    deque<Process *> runQ;
+
 public:
     void add_process(Process *p)
     {
-        /*code*/
+        runQ.push_front(p);
+        if (runQ.size() == 1)
+        {
+            return;
+        }
+
+        Process *proc = runQ[0];
+        int j = 1;
+        while (j < runQ.size() && proc->remaining_cpu_time < runQ[j]->remaining_cpu_time)
+        {
+            runQ[j - 1] = runQ[j];
+            j = j + 1;
+        }
+        runQ[j - 1] = proc;
     }
 
     Process *get_next_process()
     {
-        return new Process("");
+        if (runQ.empty())
+        {
+            return nullptr;
+        }
+        Process *p = runQ.back();
+        runQ.pop_back();
+        return p;
     }
 
     string to_string()
