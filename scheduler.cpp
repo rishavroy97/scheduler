@@ -366,7 +366,6 @@ int CURRENT_TIME = 0;                             // current CPU time
 bool CALL_SCHEDULER = false;
 Scheduler *SCHEDULER = nullptr;
 Process *CURRENT_RUNNING_PROCESS = nullptr;
-Process *CURRENT_BLOCKED_PROCESS = nullptr;
 DES_Layer *DISPATCHER = nullptr;
 bool VERBOSE = false;
 bool SHOW_SCHED_DETAILS = false;
@@ -558,11 +557,10 @@ void run_simulation()
                 printf("%d %d %d: %s -> %s\n",
                        CURRENT_TIME, proc->get_pid(), timeInPrevState,
                        STATE_STRING[proc->state].c_str(), STATE_STRING[READY].c_str());
-            if (proc == CURRENT_BLOCKED_PROCESS)
+            if (proc->state == BLOCKED)
             {
                 /** perform accounting for BLOCKED to READY **/
                 proc->io_time += timeInPrevState;
-                CURRENT_BLOCKED_PROCESS = nullptr;
             }
 
             /** add process to run queue, no event created **/
@@ -656,7 +654,6 @@ void run_simulation()
 
             /** calculations for new state **/
             int ib = myrandom(proc->io_burst);
-            CURRENT_BLOCKED_PROCESS = proc;
 
             /** create an event for when process becomes READY again **/
             Event *ready_event = new Event(proc);
