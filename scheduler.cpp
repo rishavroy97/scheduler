@@ -238,6 +238,7 @@ public:
         if (priority < 0) {
             // add to expired queue
             priority = p->static_priority - 1;
+            p->dynamic_priority = priority;
             deque<Process *> *expired_q = &((*expiredRunQ)[priority]);
             expired_q->push_front(p);
 
