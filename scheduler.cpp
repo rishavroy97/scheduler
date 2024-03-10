@@ -138,6 +138,18 @@ public:
         }
         eventQ[j - 1] = evt;
     }
+
+    bool has_pending_events(Process *process, int time) {
+        int i = (int) eventQ.size() - 1;
+        while (i >= 0) {
+            Process *p = eventQ[i]->process;
+            if (p->get_pid() == process->get_pid() && eventQ[i]->timestamp == time) {
+                return true;
+            }
+            i--;
+        }
+        return false;
+    }
 };
 
 class Scheduler {
@@ -157,7 +169,7 @@ public:
 
     virtual string to_string() = 0;
 
-    virtual bool test_preempt(Process *activated_proc, Process *curr_proc, int curr_time) = 0;
+    virtual bool test_preempt(Process *activated_proc, Process *curr_proc, DES_Layer *dispatcher, int curr_time) = 0;
 
     [[nodiscard]] int get_maxprio() const {
         return max_priority;
@@ -188,7 +200,7 @@ public:
         return p;
     }
 
-    bool test_preempt(Process *activated_proc, Process *curr_proc, int curr_time) override {
+    bool test_preempt(Process *activated_proc, Process *curr_proc, DES_Layer *dispatcher, int curr_time) override {
         return false;
     }
 
@@ -215,7 +227,7 @@ public:
         return p;
     }
 
-    bool test_preempt(Process *activated_proc, Process *curr_proc, int curr_time) override {
+    bool test_preempt(Process *activated_proc, Process *curr_proc, DES_Layer *dispatcher, int curr_time) override {
         return false;
     }
 
@@ -253,7 +265,7 @@ public:
         return p;
     }
 
-    bool test_preempt(Process *activated_proc, Process *curr_proc, int curr_time) override {
+    bool test_preempt(Process *activated_proc, Process *curr_proc, DES_Layer *dispatcher, int curr_time) override {
         return false;
     }
 
@@ -283,7 +295,7 @@ public:
         return p;
     }
 
-    bool test_preempt(Process *activated_proc, Process *curr_proc, int curr_time) override {
+    bool test_preempt(Process *activated_proc, Process *curr_proc, DES_Layer *dispatcher, int curr_time) override {
         return false;
     }
 
@@ -359,7 +371,7 @@ public:
         return nullptr;
     }
 
-    bool test_preempt(Process *activated_proc, Process *curr_proc, int curr_time) override {
+    bool test_preempt(Process *activated_proc, Process *curr_proc, DES_Layer *dispatcher, int curr_time) override {
         return false;
     }
 
@@ -440,14 +452,16 @@ public:
         return nullptr;
     }
 
-    bool test_preempt(Process *activated_proc, Process *curr_proc, int curr_time) override {
+    bool test_preempt(Process *activated_proc, Process *curr_proc, DES_Layer *dispatcher, int curr_time) override {
         if (curr_proc == nullptr) {
             return false;
         }
         if (activated_proc->get_pid() == curr_proc->get_pid()) {
             return false;
         }
-        return true;
+        bool is_higher_priority = activated_proc->dynamic_priority > curr_proc->dynamic_priority;
+        bool has_no_pending_events = dispatcher != nullptr && !dispatcher->has_pending_events(curr_proc, curr_time);
+        return is_higher_priority && has_no_pending_events;
     }
 
     string to_string() override {
@@ -672,6 +686,10 @@ void run_simulation() {
                 proc->state_start_time = CURRENT_TIME;
                 proc->state = READY;
 
+                /** new process ready, preempt the current running process **/
+                if (SCHEDULER->test_preempt(proc, CURRENT_RUNNING_PROCESS, DISPATCHER, CURRENT_TIME)) {
+                }
+
                 SCHEDULER->add_process(proc);
                 CALL_SCHEDULER = true;
                 break;
@@ -701,6 +719,11 @@ void run_simulation() {
                 proc->dynamic_priority--;
                 proc->state_start_time = CURRENT_TIME;
                 proc->state = READY;
+
+                /** new process ready, preempt the current running process **/
+                if (SCHEDULER->test_preempt(proc, CURRENT_RUNNING_PROCESS, DISPATCHER, CURRENT_TIME)) {
+
+                }
 
                 SCHEDULER->add_process(proc);
                 CALL_SCHEDULER = true;
