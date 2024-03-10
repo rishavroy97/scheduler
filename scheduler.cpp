@@ -78,6 +78,68 @@ public:
     }
 };
 
+class Event {
+public:
+    Process *process;
+    int timestamp;
+    Transitions transition;
+
+    explicit Event(Process *p) {
+        process = p;
+    }
+};
+
+class DES_Layer {
+    // private:
+
+public:
+    // TODO: Make member private
+    deque<Event *> eventQ;
+
+    /**
+     * Add the created processes to the Event Queue
+     */
+    void initialize(const vector<Process *> &processes) {
+        for (Process *p: processes) {
+            auto *e = new Event(p);
+            e->timestamp = p->arrival_time;
+            e->transition = TRANS_TO_READY;
+            put_event(e);
+        }
+    }
+
+    Event *get_event() {
+        if (eventQ.empty()) {
+            return nullptr;
+        }
+        Event *e = eventQ.back();
+        eventQ.pop_back();
+        return e;
+    }
+
+    int get_next_event_time() {
+        if (eventQ.empty()) {
+            return -1;
+        }
+        return eventQ.back()->timestamp;
+    }
+
+    void put_event(Event *e) {
+        eventQ.push_front(e);
+        if (eventQ.size() == 1) {
+            return;
+        }
+
+        Event *evt = eventQ[0];
+        int j = 1;
+        while (j < eventQ.size() && evt->timestamp < eventQ[j]->timestamp) {
+            eventQ[j - 1] = eventQ[j];
+            j = j + 1;
+        }
+        eventQ[j - 1] = evt;
+    }
+};
+
 class Scheduler {
 protected:
     int quantum;
@@ -94,6 +156,8 @@ public:
     virtual Process *get_next_process() = 0;
 
     virtual string to_string() = 0;
+
+    virtual bool test_preempt(Process *activated_proc, Process *curr_proc, int curr_time) = 0;
 
     [[nodiscard]] int get_maxprio() const {
         return max_priority;
@@ -124,6 +188,10 @@ public:
         return p;
     }
 
+    bool test_preempt(Process *activated_proc, Process *curr_proc, int curr_time) override {
+        return false;
+    }
+
     string to_string() override {
         return "FCFS";
     }
@@ -145,6 +213,10 @@ public:
         Process *p = runQ.front();
         runQ.pop_front();
         return p;
+    }
+
+    bool test_preempt(Process *activated_proc, Process *curr_proc, int curr_time) override {
+        return false;
     }
 
     string to_string() override {
@@ -181,6 +253,10 @@ public:
         return p;
     }
 
+    bool test_preempt(Process *activated_proc, Process *curr_proc, int curr_time) override {
+        return false;
+    }
+
     string to_string() override {
         return "SRTF";
     }
@@ -205,6 +281,10 @@ public:
         Process *p = runQ.back();
         runQ.pop_back();
         return p;
+    }
+
+    bool test_preempt(Process *activated_proc, Process *curr_proc, int curr_time) override {
+        return false;
     }
 
     string to_string() override {
@@ -277,6 +357,10 @@ public:
         }
 
         return nullptr;
+    }
+
+    bool test_preempt(Process *activated_proc, Process *curr_proc, int curr_time) override {
+        return false;
     }
 
     string to_string() override {
@@ -356,6 +440,16 @@ public:
         return nullptr;
     }
 
+    bool test_preempt(Process *activated_proc, Process *curr_proc, int curr_time) override {
+        if (curr_proc == nullptr) {
+            return false;
+        }
+        if (activated_proc->get_pid() == curr_proc->get_pid()) {
+            return false;
+        }
+        return true;
+    }
+
     string to_string() override {
         return "PREPRIO " + std::to_string(quantum);
     }
@@ -363,68 +457,6 @@ public:
     ~PreemptivePriorityScheduler() override {
         delete activeRunQ;
         delete expiredRunQ;
-    }
-};
-
-class Event {
-public:
-    Process *process;
-    int timestamp;
-    Transitions transition;
-
-    explicit Event(Process *p) {
-        process = p;
-    }
-};
-
-class DES_Layer {
-    // private:
-
-public:
-    // TODO: Make member private
-    deque<Event *> eventQ;
-
-    /**
-     * Add the created processes to the Event Queue
-     */
-    void initialize(const vector<Process *> &processes) {
-        for (Process *p: processes) {
-            auto *e = new Event(p);
-            e->timestamp = p->arrival_time;
-            e->transition = TRANS_TO_READY;
-            put_event(e);
-        }
-    }
-
-    Event *get_event() {
-        if (eventQ.empty()) {
-            return nullptr;
-        }
-        Event *e = eventQ.back();
-        eventQ.pop_back();
-        return e;
-    }
-
-    int get_next_event_time() {
-        if (eventQ.empty()) {
-            return -1;
-        }
-        return eventQ.back()->timestamp;
-    }
-
-    void put_event(Event *e) {
-        eventQ.push_front(e);
-        if (eventQ.size() == 1) {
-            return;
-        }
-
-        Event *evt = eventQ[0];
-        int j = 1;
-        while (j < eventQ.size() && evt->timestamp < eventQ[j]->timestamp) {
-            eventQ[j - 1] = eventQ[j];
-            j = j + 1;
-        }
-        eventQ[j - 1] = evt;
     }
 };
 
