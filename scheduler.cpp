@@ -616,6 +616,12 @@ void run_simulation()
         case TRANS_TO_READY:
         {
             /** must come from BLOCKED or CREATED **/
+            if (proc->state != BLOCKED && proc->state != CREATED && proc->state != RUNNING)
+            {
+                printf("TRANS_TO_READY - Incorrect incoming state - %s, expected BLOCKED/CREATED/RUNNING\n", STATE_STRING[proc->state].c_str());
+                exit(1);
+            }
+
             if (VERBOSE)
                 printf("%d %d %d: %s -> %s\n",
                        CURRENT_TIME, proc->get_pid(), timeInPrevState,
@@ -645,6 +651,11 @@ void run_simulation()
         }
         case TRANS_TO_PREEMPT: // similar to TRANS_TO_READY
         {
+            if (proc->state != RUNNING)
+            {
+                printf("TRANS_TO_PREEMPT - Incorrect incoming state - %s, expected RUNNING\n", STATE_STRING[proc->state].c_str());
+                exit(1);
+            }
             /** perform accounting for RUNNING to PREEMPT **/
             proc->remaining_cpu_time -= timeInPrevState;
             proc->curr_cpu_burst -= timeInPrevState;
@@ -676,6 +687,11 @@ void run_simulation()
         }
         case TRANS_TO_RUN:
         {
+            if (proc->state != READY)
+            {
+                printf("TRANS_TO_RUN - Incorrect incoming state - %s, expected READY\n", STATE_STRING[proc->state].c_str());
+                exit(1);
+            }
             /** perform accounting READY to RUNNING **/
             proc->cpu_wait_time += timeInPrevState;
 
@@ -729,6 +745,12 @@ void run_simulation()
         }
         case TRANS_TO_BLOCK:
         {
+            if (proc->state != RUNNING)
+            {
+                printf("TRANS_TO_BLOCK - Incorrect incoming state - %s, expected RUNNING\n", STATE_STRING[proc->state].c_str());
+                exit(1);
+            }
+
             /** perform accounting RUNNING to BLOCK **/
             proc->remaining_cpu_time -= timeInPrevState;
             proc->curr_cpu_burst = 0;
@@ -762,6 +784,12 @@ void run_simulation()
         }
         case TRANS_TO_DONE:
         {
+            if (proc->state != RUNNING)
+            {
+                printf("TRANS_TO_DONE - Incorrect incoming state - %s, expected RUNNING\n", STATE_STRING[proc->state].c_str());
+                exit(1);
+            }
+
             /** perform accounting RUNNING to DONE **/
             proc->finishing_time = CURRENT_TIME;
             CURRENT_RUNNING_PROCESS = nullptr;
