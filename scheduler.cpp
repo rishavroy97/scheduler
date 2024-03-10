@@ -21,6 +21,14 @@ enum Transitions
     TRANS_TO_RUN,
 };
 
+/** TODO - Delete this **/
+map<Transitions, string> Transitions_Strings = {
+    {Transitions::TRANS_TO_BLOCK, "TRANS_TO_BLOCK"},
+    {Transitions::TRANS_TO_DONE, "TRANS_TO_DONE"},
+    {Transitions::TRANS_TO_PREEMPT, "TRANS_TO_PREEMPT"},
+    {Transitions::TRANS_TO_READY, "TRANS_TO_READY"},
+    {Transitions::TRANS_TO_RUN, "TRANS_TO_RUN"}}; // convert enums to strings
+
 enum Proc_State
 {
     BLOCKED,
@@ -229,6 +237,21 @@ public:
 
 class PriorityScheduler : public Scheduler
 {
+private:
+    int count = 0;
+    vector<deque<Process *>> *activeRunQ = new vector<deque<Process *>>;
+    vector<deque<Process *>> *expiredRunQ = new vector<deque<Process *>>;
+
+    bool is_empty(vector<deque<Process *>> *prioQ)
+    {
+        for (deque<Process *> q : *prioQ)
+        {
+            if (!q.empty())
+                return false;
+        }
+        return true;
+    }
+
 public:
     PriorityScheduler(int num, int maxprio) : Scheduler(num, maxprio)
     {
@@ -239,11 +262,40 @@ public:
     void add_process(Process *p)
     {
         /*code*/
+        if (activeRunQ->size() == 0)
+        {
+            deque<Process *> dq;
+            dq.push_front(p);
+            activeRunQ->push_back(dq);
+        }
+        else
+        {
+            deque<Process *> dq = (*activeRunQ)[0];
+            dq.push_front(p);
+        }
+
+        printf("Added process(pid=%d) to active Q=0(qSize=%d)\n", p->get_pid(), (int)(*activeRunQ)[0].size());
+        count++;
+        if (count == 150)
+            exit(1);
     }
 
     Process *get_next_process()
     {
-        return new Process("");
+        if (is_empty(activeRunQ) && is_empty(expiredRunQ))
+        {
+            return nullptr;
+        }
+
+        deque<Process *> dq = (*activeRunQ)[0];
+        printf("Before - Fetching process from active Q=0(qSize=%d)\n", (int)dq.size());
+        Process *p = dq.back();
+        dq.pop_back();
+        printf("Fetched process(pid=%d) from active Q=0(qSize=%d)\n", p->get_pid(), (int)dq.size());
+        count++;
+        if (count == 150)
+            exit(1);
+        return p;
     }
 
     string to_string()
@@ -318,7 +370,9 @@ public:
             return nullptr;
         }
         Event *e = eventQ.back();
+        printf("Fetching Event pid = %d, timestamp = %d, trans = %s\n", e->process->get_pid(), e->timestamp, Transitions_Strings[e->transition].c_str());
         eventQ.pop_back();
+        printf("Current Event Q size = %d\n", (int)eventQ.size());
         return e;
     }
 
@@ -333,6 +387,7 @@ public:
 
     void put_event(Event *e)
     {
+        printf("Adding Event pid = %d, timestamp = %d, trans = %s\n", e->process->get_pid(), e->timestamp, Transitions_Strings[e->transition].c_str());
         eventQ.push_front(e);
         if (eventQ.size() == 1)
         {
@@ -347,6 +402,7 @@ public:
             j = j + 1;
         }
         eventQ[j - 1] = evt;
+        printf("Current Event Q size = %d\n", (int)eventQ.size());
     }
 };
 
@@ -359,27 +415,19 @@ map<Proc_State, string> STATE_STRING = {
     {Proc_State::CREATED, "CREATED"},
     {Proc_State::PREEMPT, "PREEMPT"},
     {Proc_State::READY, "READY"},
-    {Proc_State::RUNNING, "RUNNG"}}; // convert enums to strings
-
-/** TODO - Delete this **/
-map<Transitions, string> Transitions_Strings = {
-    {Transitions::TRANS_TO_BLOCK, "TRANS_TO_BLOCK"},
-    {Transitions::TRANS_TO_DONE, "TRANS_TO_DONE"},
-    {Transitions::TRANS_TO_PREEMPT, "TRANS_TO_PREEMPT"},
-    {Transitions::TRANS_TO_READY, "TRANS_TO_READY"},
-    {Transitions::TRANS_TO_RUN, "TRANS_TO_RUN"}}; // convert enums to strings
-int RANDVALS[100000];                             // initialize a list of random numbers
-int OFS = 0;                                      // line offset for the random file
-vector<Process *> PROCESSES;                      // initialize a list of processes
-int Process::process_count = 0;                   // set process count static data to 0
-int CURRENT_TIME = 0;                             // current CPU time
-int BLOCKED_PROCESS_COUNT = 0;                    // total number of blocked process at a particular time
-int TIME_IO_BUSY = 0;                             // time at least one process is performing IO
-bool CALL_SCHEDULER = false;                      // flag to call the next process in the scheduler
-Scheduler *SCHEDULER = nullptr;                   // Scheduler instance being used in simulation
-Process *CURRENT_RUNNING_PROCESS = nullptr;       // pointer to the current running process
-DES_Layer *DISPATCHER = nullptr;                  // DES Layer being used in the simulation
-bool VERBOSE = false;                             // flag to disply extra information for every event
+    {Proc_State::RUNNING, "RUNNG"}};        // convert enums to strings
+int RANDVALS[100000];                       // initialize a list of random numbers
+int OFS = 0;                                // line offset for the random file
+vector<Process *> PROCESSES;                // initialize a list of processes
+int Process::process_count = 0;             // set process count static data to 0
+int CURRENT_TIME = 0;                       // current CPU time
+int BLOCKED_PROCESS_COUNT = 0;              // total number of blocked process at a particular time
+int TIME_IO_BUSY = 0;                       // time at least one process is performing IO
+bool CALL_SCHEDULER = false;                // flag to call the next process in the scheduler
+Scheduler *SCHEDULER = nullptr;             // Scheduler instance being used in simulation
+Process *CURRENT_RUNNING_PROCESS = nullptr; // pointer to the current running process
+DES_Layer *DISPATCHER = nullptr;            // DES Layer being used in the simulation
+bool VERBOSE = false;                       // flag to disply extra information for every event
 
 /** Not implemented these features **/
 bool SHOW_SCHED_DETAILS = false;
@@ -590,6 +638,7 @@ void run_simulation()
             proc->state_start_time = CURRENT_TIME;
             proc->state = READY;
 
+            printf("Adding process pid = %d to scheduler (TRANS_TO_READY)\n", proc->get_pid());
             SCHEDULER->add_process(proc);
             CALL_SCHEDULER = true;
             break;
@@ -620,6 +669,7 @@ void run_simulation()
             proc->state_start_time = CURRENT_TIME;
             proc->state = READY;
 
+            printf("Adding process pid = %d to scheduler (TRANS_TO_PREEMPT)\n", proc->get_pid());
             SCHEDULER->add_process(proc);
             CALL_SCHEDULER = true;
             break;
