@@ -198,17 +198,27 @@ public:
 
 class RRScheduler : public Scheduler
 {
+private:
+    deque<Process *> runQ;
+
 public:
     RRScheduler(int num) : Scheduler(num) {}
 
     void add_process(Process *p)
     {
-        /*code*/
+        p->dynamic_priority = p->static_priority - 1;
+        runQ.push_front(p);
     }
 
     Process *get_next_process()
     {
-        return new Process("");
+        if (runQ.empty())
+        {
+            return nullptr;
+        }
+        Process *p = runQ.back();
+        runQ.pop_back();
+        return p;
     }
 
     string to_string()
@@ -572,6 +582,8 @@ void run_simulation()
                     TIME_IO_BUSY += CURRENT_TIME - iobusy_start_time;
                     iobusy_start_time = 0;
                 }
+                // reset dynamic priority
+                proc->dynamic_priority = proc->static_priority - 1;
             }
 
             /** add process to run queue, no event created **/
@@ -582,22 +594,31 @@ void run_simulation()
             CALL_SCHEDULER = true;
             break;
         }
-        case TRANS_TO_PREEMPT:
+        case TRANS_TO_PREEMPT: // similar to TRANS_TO_READY
         {
-            /**
-             * Unknown Case
-             */
+            /** perform accounting for RUNNING to PREEMPT **/
+            proc->remaining_cpu_time -= timeInPrevState;
+            proc->curr_cpu_burst -= timeInPrevState;
+
+            /** must come from RUNNING (preemption) **/
             if (VERBOSE)
-                printf("%d %d %d: %s -> %s\n",
+                printf("%d %d %d: %s -> %s  cb=%d rem=%d prio=%d\n",
                        CURRENT_TIME, proc->get_pid(), timeInPrevState,
-                       STATE_STRING[proc->state].c_str(), STATE_STRING[PREEMPT].c_str());
+                       STATE_STRING[proc->state].c_str(), STATE_STRING[READY].c_str(),
+                       proc->curr_cpu_burst, proc->remaining_cpu_time, proc->dynamic_priority);
             if (proc == CURRENT_RUNNING_PROCESS)
             {
                 CURRENT_RUNNING_PROCESS = nullptr;
             }
-            // add to runqueue (no event is generated)
+
+            /** add process to run queue, no event created **/
+            proc->dynamic_priority--;
+            if (proc->dynamic_priority == -1)
+            {
+                proc->dynamic_priority = proc->static_priority - 1;
+            }
             proc->state_start_time = CURRENT_TIME;
-            proc->state = PREEMPT;
+            proc->state = READY;
 
             SCHEDULER->add_process(proc);
             CALL_SCHEDULER = true;
