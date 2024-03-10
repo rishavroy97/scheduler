@@ -52,7 +52,7 @@ public:
     int dynamic_priority;   // dynamic priority
     Proc_State state;       // current
 
-    explicit Process(const string& args) {
+    explicit Process(const string &args) {
         arrival_time = total_cpu_time = cpu_burst = io_burst = 0;
         pid = Process::process_count++;
         char *buffer = new char[args.length() + 1];
@@ -211,12 +211,11 @@ public:
 
 class PriorityScheduler : public Scheduler {
 private:
-    int count = 0;
     vector<deque<Process *>> *activeRunQ = new vector<deque<Process *>>;
     vector<deque<Process *>> *expiredRunQ = new vector<deque<Process *>>;
 
     static bool is_empty(vector<deque<Process *>> *priorityQ) {
-        for (const deque<Process *>& q: *priorityQ)
+        for (const deque<Process *> &q: *priorityQ)
             if (!q.empty())
                 return false;
 
@@ -225,6 +224,78 @@ private:
 
 public:
     PriorityScheduler(int num, int maxprio) : Scheduler(num, maxprio) {
+        if (max_priority <= 0)
+            max_priority = 4;
+
+        activeRunQ->resize(max_priority);
+        expiredRunQ->resize(max_priority);
+    }
+
+    void add_process(Process *p) override {
+
+        int priority = p->dynamic_priority;
+
+        if (priority < 0) {
+            // add to expired queue
+            priority = p->static_priority - 1;
+            deque<Process *> *expired_q = &((*expiredRunQ)[priority]);
+            expired_q->push_front(p);
+
+            return;
+        }
+
+        // add to active queue
+        deque<Process *> *active_q = &(*activeRunQ)[priority];
+        active_q->push_front(p);
+    }
+
+    Process *get_next_process() override {
+        if (is_empty(activeRunQ) && is_empty(expiredRunQ)) {
+            return nullptr;
+        }
+
+        if (is_empty(activeRunQ)) {
+            activeRunQ->swap(*expiredRunQ);
+        }
+
+        deque<Process *> *highest_priority_q = nullptr;
+        for (int i = max_priority - 1; i >= 0; i--) {
+            if (!(*activeRunQ)[i].empty()) {
+                highest_priority_q = &((*activeRunQ)[i]);
+                break;
+            }
+        }
+
+        if (highest_priority_q) {
+            Process *p = highest_priority_q->back();
+            highest_priority_q->pop_back();
+            return p;
+        }
+
+        return nullptr;
+    }
+
+    string to_string() override {
+        return "PRIO " + std::to_string(quantum);
+    }
+};
+
+class PreemptivePriorityScheduler : public Scheduler {
+private:
+    int count = 0;
+    vector<deque<Process *>> *activeRunQ = new vector<deque<Process *>>;
+    vector<deque<Process *>> *expiredRunQ = new vector<deque<Process *>>;
+
+    static bool is_empty(vector<deque<Process *>> *priorityQ) {
+        for (const deque<Process *> &q: *priorityQ)
+            if (!q.empty())
+                return false;
+
+        return true;
+    }
+
+public:
+    PreemptivePriorityScheduler(int num, int maxprio) : Scheduler(num, maxprio) {
         if (max_priority <= 0)
             max_priority = 4;
 
@@ -261,26 +332,6 @@ public:
     }
 
     string to_string() override {
-        return "PRIO " + std::to_string(quantum);
-    }
-};
-
-class PreemptivePriorityScheduler : public Scheduler {
-public:
-    PreemptivePriorityScheduler(int num, int maxprio) : Scheduler(num, maxprio) {
-        if (max_priority <= 0)
-            max_priority = 4;
-    }
-
-    void add_process(Process *p) override {
-        /*code*/
-    }
-
-    Process *get_next_process() override {
-        return new Process("");
-    }
-
-    string to_string() override {
         return "PREPRIO " + std::to_string(quantum);
     }
 };
@@ -306,7 +357,7 @@ public:
     /**
      * Add the created processes to the Event Queue
      */
-    void initialize(const vector<Process *>& processes) {
+    void initialize(const vector<Process *> &processes) {
         for (Process *p: processes) {
             auto *e = new Event(p);
             e->timestamp = p->arrival_time;
