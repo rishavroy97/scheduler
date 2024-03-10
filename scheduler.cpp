@@ -1,7 +1,6 @@
-#include <ctype.h>
-#include <stdio.h>
-#include <string.h>
-#include <stdlib.h>
+#include <cstdio>
+#include <cstring>
+#include <cstdlib>
 #include <unistd.h>
 
 #include <iostream>
@@ -12,8 +11,7 @@
 
 using namespace std;
 
-enum Transitions
-{
+enum Transitions {
     TRANS_TO_BLOCK,
     TRANS_TO_DONE,
     TRANS_TO_PREEMPT,
@@ -23,14 +21,13 @@ enum Transitions
 
 /** TODO - Delete this **/
 map<Transitions, string> Transitions_Strings = {
-    {Transitions::TRANS_TO_BLOCK, "TRANS_TO_BLOCK"},
-    {Transitions::TRANS_TO_DONE, "TRANS_TO_DONE"},
-    {Transitions::TRANS_TO_PREEMPT, "TRANS_TO_PREEMPT"},
-    {Transitions::TRANS_TO_READY, "TRANS_TO_READY"},
-    {Transitions::TRANS_TO_RUN, "TRANS_TO_RUN"}}; // convert enums to strings
+        {Transitions::TRANS_TO_BLOCK,   "TRANS_TO_BLOCK"},
+        {Transitions::TRANS_TO_DONE,    "TRANS_TO_DONE"},
+        {Transitions::TRANS_TO_PREEMPT, "TRANS_TO_PREEMPT"},
+        {Transitions::TRANS_TO_READY,   "TRANS_TO_READY"},
+        {Transitions::TRANS_TO_RUN,     "TRANS_TO_RUN"}}; // convert enums to strings
 
-enum Proc_State
-{
+enum Proc_State {
     BLOCKED,
     CREATED,
     PREEMPT,
@@ -38,8 +35,7 @@ enum Proc_State
     RUNNING
 };
 
-class Process
-{
+class Process {
 private:
     static int process_count;
     int pid;
@@ -56,8 +52,8 @@ public:
     int dynamic_priority;   // dynamic priority
     Proc_State state;       // current
 
-    Process(string args)
-    {
+    explicit Process(const string& args) {
+        arrival_time = total_cpu_time = cpu_burst = io_burst = 0;
         pid = Process::process_count++;
         char *buffer = new char[args.length() + 1];
         strcpy(buffer, args.c_str());
@@ -68,60 +64,56 @@ public:
         state = CREATED;
         state_start_time = arrival_time;
         remaining_cpu_time = total_cpu_time;
+        curr_cpu_burst = 0;
         io_time = 0;
         cpu_wait_time = 0;
         finishing_time = arrival_time;
+        static_priority = 1;
+        dynamic_priority = 0;
     }
 
-    int get_pid()
-    {
+    [[nodiscard]] int get_pid() const {
         return pid;
     }
 };
 
-class Scheduler
-{
+class Scheduler {
 protected:
     int quantum;
     int max_priority;
 
 public:
-    Scheduler(int q = 10000, int maxprio = 4)
-    {
+    explicit Scheduler(int q = 10000, int maxprio = 4) {
         quantum = q;
         max_priority = maxprio;
     }
 
     virtual void add_process(Process *p) = 0;
+
     virtual Process *get_next_process() = 0;
+
     virtual string to_string() = 0;
 
-    int get_maxprio()
-    {
+    [[nodiscard]] int get_maxprio() const {
         return max_priority;
     }
 
-    int get_quant()
-    {
+    [[nodiscard]] int get_quant() const {
         return quantum;
     }
 };
 
-class FCFSScheduler : public Scheduler
-{
+class FCFSScheduler : public Scheduler {
 private:
     deque<Process *> runQ;
 
 public:
-    void add_process(Process *p)
-    {
+    void add_process(Process *p) override {
         runQ.push_front(p);
     }
 
-    Process *get_next_process()
-    {
-        if (runQ.empty())
-        {
+    Process *get_next_process() override {
+        if (runQ.empty()) {
             return nullptr;
         }
         Process *p = runQ.back();
@@ -129,27 +121,22 @@ public:
         return p;
     }
 
-    string to_string()
-    {
+    string to_string() override {
         return "FCFS";
     }
 };
 
-class LCFSScheduler : public Scheduler
-{
+class LCFSScheduler : public Scheduler {
 private:
     deque<Process *> runQ;
 
 public:
-    void add_process(Process *p)
-    {
+    void add_process(Process *p) override {
         runQ.push_front(p);
     }
 
-    Process *get_next_process()
-    {
-        if (runQ.empty())
-        {
+    Process *get_next_process() override {
+        if (runQ.empty()) {
             return nullptr;
         }
         Process *p = runQ.front();
@@ -157,40 +144,33 @@ public:
         return p;
     }
 
-    string to_string()
-    {
+    string to_string() override {
         return "LCFS";
     }
 };
 
-class SRTFcheduler : public Scheduler
-{
+class SRTFScheduler : public Scheduler {
 private:
     deque<Process *> runQ;
 
 public:
-    void add_process(Process *p)
-    {
+    void add_process(Process *p) override {
         runQ.push_front(p);
-        if (runQ.size() == 1)
-        {
+        if (runQ.size() == 1) {
             return;
         }
 
         Process *proc = runQ[0];
         int j = 1;
-        while (j < runQ.size() && proc->remaining_cpu_time < runQ[j]->remaining_cpu_time)
-        {
+        while (j < runQ.size() && proc->remaining_cpu_time < runQ[j]->remaining_cpu_time) {
             runQ[j - 1] = runQ[j];
             j = j + 1;
         }
         runQ[j - 1] = proc;
     }
 
-    Process *get_next_process()
-    {
-        if (runQ.empty())
-        {
+    Process *get_next_process() override {
+        if (runQ.empty()) {
             return nullptr;
         }
         Process *p = runQ.back();
@@ -198,30 +178,25 @@ public:
         return p;
     }
 
-    string to_string()
-    {
+    string to_string() override {
         return "SRTF";
     }
 };
 
-class RRScheduler : public Scheduler
-{
+class RRScheduler : public Scheduler {
 private:
     deque<Process *> runQ;
 
 public:
-    RRScheduler(int num) : Scheduler(num) {}
+    explicit RRScheduler(int num) : Scheduler(num) {}
 
-    void add_process(Process *p)
-    {
+    void add_process(Process *p) override {
         p->dynamic_priority = p->static_priority - 1;
         runQ.push_front(p);
     }
 
-    Process *get_next_process()
-    {
-        if (runQ.empty())
-        {
+    Process *get_next_process() override {
+        if (runQ.empty()) {
             return nullptr;
         }
         Process *p = runQ.back();
@@ -229,180 +204,146 @@ public:
         return p;
     }
 
-    string to_string()
-    {
+    string to_string() override {
         return "RR " + std::to_string(quantum);
     }
 };
 
-class PriorityScheduler : public Scheduler
-{
+class PriorityScheduler : public Scheduler {
 private:
     int count = 0;
     vector<deque<Process *>> *activeRunQ = new vector<deque<Process *>>;
     vector<deque<Process *>> *expiredRunQ = new vector<deque<Process *>>;
 
-    bool is_empty(vector<deque<Process *>> *prioQ)
-    {
-        for (deque<Process *> q : *prioQ)
-        {
+    static bool is_empty(vector<deque<Process *>> *priorityQ) {
+        for (const deque<Process *>& q: *priorityQ)
             if (!q.empty())
                 return false;
-        }
+
         return true;
     }
 
 public:
-    PriorityScheduler(int num, int maxprio) : Scheduler(num, maxprio)
-    {
+    PriorityScheduler(int num, int maxprio) : Scheduler(num, maxprio) {
         if (max_priority <= 0)
             max_priority = 4;
+
+        activeRunQ->resize(max_priority);
     }
 
-    void add_process(Process *p)
-    {
-        /*code*/
-        if (activeRunQ->size() == 0)
-        {
-            deque<Process *> dq;
-            dq.push_front(p);
-            activeRunQ->push_back(dq);
-        }
-        else
-        {
-            deque<Process *> dq = (*activeRunQ)[0];
-            dq.push_front(p);
-        }
+    void add_process(Process *p) override {
+        deque<Process *> *dq = &(*activeRunQ)[0];
+        dq->push_front(p);
 
-        printf("Added process(pid=%d) to active Q=0(qSize=%d)\n", p->get_pid(), (int)(*activeRunQ)[0].size());
         count++;
-        if (count == 150)
-            exit(1);
+//        if (count == 150) {
+//            printf("Count Done\n");
+//            exit(1);
+//        }
     }
 
-    Process *get_next_process()
-    {
-        if (is_empty(activeRunQ) && is_empty(expiredRunQ))
-        {
+    Process *get_next_process() override {
+        if (is_empty(activeRunQ) && is_empty(expiredRunQ)) {
             return nullptr;
         }
 
-        deque<Process *> dq = (*activeRunQ)[0];
-        printf("Before - Fetching process from active Q=0(qSize=%d)\n", (int)dq.size());
-        Process *p = dq.back();
-        dq.pop_back();
-        printf("Fetched process(pid=%d) from active Q=0(qSize=%d)\n", p->get_pid(), (int)dq.size());
+        deque<Process *> *dq = &(*activeRunQ)[0];
+        Process *p = dq->back();
+        dq->pop_back();
+
+        // helpline
         count++;
-        if (count == 150)
-            exit(1);
+//        if (count == 150) {
+//            printf("Count Done\n");
+//            exit(1);
+//        }
         return p;
     }
 
-    string to_string()
-    {
+    string to_string() override {
         return "PRIO " + std::to_string(quantum);
     }
 };
 
-class PreemptivePriorityScheduler : public Scheduler
-{
+class PreemptivePriorityScheduler : public Scheduler {
 public:
-    PreemptivePriorityScheduler(int num, int maxprio) : Scheduler(num, maxprio)
-    {
+    PreemptivePriorityScheduler(int num, int maxprio) : Scheduler(num, maxprio) {
         if (max_priority <= 0)
             max_priority = 4;
     }
 
-    void add_process(Process *p)
-    {
+    void add_process(Process *p) override {
         /*code*/
     }
 
-    Process *get_next_process()
-    {
+    Process *get_next_process() override {
         return new Process("");
     }
 
-    string to_string()
-    {
+    string to_string() override {
         return "PREPRIO " + std::to_string(quantum);
     }
 };
 
-class Event
-{
+class Event {
 public:
     Process *process;
     int timestamp;
     Transitions transition;
 
-    Event(Process *p)
-    {
+    explicit Event(Process *p) {
         process = p;
     }
 };
 
-class DES_Layer
-{
+class DES_Layer {
     // private:
 
 public:
     // TODO: Make member private
     deque<Event *> eventQ;
+
     /**
      * Add the created processes to the Event Queue
      */
-    void initialize(vector<Process *> processes)
-    {
-        for (Process *p : processes)
-        {
-            Event *e = new Event(p);
+    void initialize(const vector<Process *>& processes) {
+        for (Process *p: processes) {
+            auto *e = new Event(p);
             e->timestamp = p->arrival_time;
             e->transition = TRANS_TO_READY;
             put_event(e);
         }
     }
 
-    Event *get_event()
-    {
-        if (eventQ.empty())
-        {
+    Event *get_event() {
+        if (eventQ.empty()) {
             return nullptr;
         }
         Event *e = eventQ.back();
-        printf("Fetching Event pid = %d, timestamp = %d, trans = %s\n", e->process->get_pid(), e->timestamp, Transitions_Strings[e->transition].c_str());
         eventQ.pop_back();
-        printf("Current Event Q size = %d\n", (int)eventQ.size());
         return e;
     }
 
-    int get_next_event_time()
-    {
-        if (eventQ.empty())
-        {
+    int get_next_event_time() {
+        if (eventQ.empty()) {
             return -1;
         }
         return eventQ.back()->timestamp;
     }
 
-    void put_event(Event *e)
-    {
-        printf("Adding Event pid = %d, timestamp = %d, trans = %s\n", e->process->get_pid(), e->timestamp, Transitions_Strings[e->transition].c_str());
+    void put_event(Event *e) {
         eventQ.push_front(e);
-        if (eventQ.size() == 1)
-        {
+        if (eventQ.size() == 1) {
             return;
         }
 
         Event *evt = eventQ[0];
         int j = 1;
-        while (j < eventQ.size() && evt->timestamp < eventQ[j]->timestamp)
-        {
+        while (j < eventQ.size() && evt->timestamp < eventQ[j]->timestamp) {
             eventQ[j - 1] = eventQ[j];
             j = j + 1;
         }
         eventQ[j - 1] = evt;
-        printf("Current Event Q size = %d\n", (int)eventQ.size());
     }
 };
 
@@ -411,11 +352,11 @@ public:
  */
 
 map<Proc_State, string> STATE_STRING = {
-    {Proc_State::BLOCKED, "BLOCK"},
-    {Proc_State::CREATED, "CREATED"},
-    {Proc_State::PREEMPT, "PREEMPT"},
-    {Proc_State::READY, "READY"},
-    {Proc_State::RUNNING, "RUNNG"}};        // convert enums to strings
+        {Proc_State::BLOCKED, "BLOCK"},
+        {Proc_State::CREATED, "CREATED"},
+        {Proc_State::PREEMPT, "PREEMPT"},
+        {Proc_State::READY,   "READY"},
+        {Proc_State::RUNNING, "RUNNG"}};        // convert enums to strings
 int RANDVALS[100000];                       // initialize a list of random numbers
 int OFS = 0;                                // line offset for the random file
 vector<Process *> PROCESSES;                // initialize a list of processes
@@ -427,7 +368,7 @@ bool CALL_SCHEDULER = false;                // flag to call the next process in 
 Scheduler *SCHEDULER = nullptr;             // Scheduler instance being used in simulation
 Process *CURRENT_RUNNING_PROCESS = nullptr; // pointer to the current running process
 DES_Layer *DISPATCHER = nullptr;            // DES Layer being used in the simulation
-bool VERBOSE = false;                       // flag to disply extra information for every event
+bool VERBOSE = false;                       // flag to display extra information for every event
 
 /** Not implemented these features **/
 bool SHOW_SCHED_DETAILS = false;
@@ -444,12 +385,9 @@ bool SHOW_SINGLE_STEP = false;
  * @param str - actual string
  * @param ch - character to be searched
  */
-bool hasChar(const char *str, char ch)
-{
-    while (*str != '\0')
-    {
-        if (*str == ch)
-        {
+bool hasChar(const char *str, char ch) {
+    while (*str != '\0') {
+        if (*str == ch) {
             return true;
         }
         str++;
@@ -463,8 +401,7 @@ bool hasChar(const char *str, char ch)
  *
  * @returns - random value in the range of 1,..,burst
  */
-int myrandom(int burst)
-{
+int get_random(int burst) {
     int random = 1 + (RANDVALS[OFS] % burst);
     OFS++;
     return random;
@@ -474,13 +411,12 @@ int myrandom(int burst)
  * Print error message for incorrect input arguments
  * @param - filename - executable file's name
  */
-void print_usage(char *filename)
-{
+void print_usage(char *filename) {
     printf("Usage: %s [-v] [-t] [-e] [-p] [-i] [-s sched] inputfile randomfile\n"
            "-v enables verbose\n"
            "-t enables scheduler details\n"
            "-e enables event tracing\n"
-           "-p enables E scheduler preempton tracing\n"
+           "-p enables E scheduler preemption tracing\n"
            "-i single steps event by event\n",
            filename);
 }
@@ -491,54 +427,46 @@ void print_usage(char *filename)
  *
  * @returns - the correct Scheduler based on the arguments
  */
-Scheduler *getScheduler(char *args)
-{
-    switch (args[0])
-    {
-    case 'F':
-        return new FCFSScheduler();
-    case 'L':
-        return new LCFSScheduler();
-    case 'S':
-        return new SRTFcheduler();
-    case 'R':
-    {
-        int quantum;
-        sscanf(args, "R%d", &quantum);
-        if (quantum <= 0)
-        {
-            printf("Invalid scheduler param <%s>\n", args);
-            exit(1);
+Scheduler *getScheduler(char *args) {
+    switch (args[0]) {
+        case 'F':
+            return new FCFSScheduler();
+        case 'L':
+            return new LCFSScheduler();
+        case 'S':
+            return new SRTFScheduler();
+        case 'R': {
+            int quantum;
+            sscanf(args, "R%d", &quantum);
+            if (quantum <= 0) {
+                printf("Invalid scheduler param <%s>\n", args);
+                exit(1);
+            }
+            return new RRScheduler(quantum);
         }
-        return new RRScheduler(quantum);
-    }
-    case 'P':
-    {
-        int quantum;
-        int maxprio;
-        sscanf(args, "P%d:%d", &quantum, &maxprio);
-        if (quantum <= 0 || (hasChar(args, ':') && maxprio <= 0))
-        {
-            printf("Invalid scheduler param <%s>\n", args);
-            exit(1);
+        case 'P': {
+            int quantum;
+            int maxprio;
+            sscanf(args, "P%d:%d", &quantum, &maxprio);
+            if (quantum <= 0 || (hasChar(args, ':') && maxprio <= 0)) {
+                printf("Invalid scheduler param <%s>\n", args);
+                exit(1);
+            }
+            return new PriorityScheduler(quantum, maxprio);
         }
-        return new PriorityScheduler(quantum, maxprio);
-    }
-    case 'E':
-    {
-        int quantum;
-        int maxprio;
-        sscanf(args, "E%d:%d", &quantum, &maxprio);
-        if (quantum <= 0 || (hasChar(args, ':') && maxprio <= 0))
-        {
-            printf("Invalid scheduler param <%s>\n", args);
-            exit(1);
+        case 'E': {
+            int quantum;
+            int maxprio;
+            sscanf(args, "E%d:%d", &quantum, &maxprio);
+            if (quantum <= 0 || (hasChar(args, ':') && maxprio <= 0)) {
+                printf("Invalid scheduler param <%s>\n", args);
+                exit(1);
+            }
+            return new PreemptivePriorityScheduler(quantum, maxprio);
         }
-        return new PreemptivePriorityScheduler(quantum, maxprio);
-    }
-    default:
-        printf("Unknown Scheduler spec: -v {FLSRPE}\n");
-        exit(1);
+        default:
+            printf("Unknown Scheduler spec: -v {FLSRPE}\n");
+            exit(1);
     }
 }
 
@@ -546,13 +474,11 @@ Scheduler *getScheduler(char *args)
  * Parse the numbers from the random-number file
  * @param - filename - random-number file
  */
-void parse_randoms(char *filename)
-{
+void parse_randoms(char *filename) {
     fstream rand_file;
     rand_file.open(filename, ios::in);
 
-    if (!rand_file.is_open())
-    {
+    if (!rand_file.is_open()) {
         printf("Not a valid inputfile <%s>\n", filename);
         exit(1);
     }
@@ -560,8 +486,7 @@ void parse_randoms(char *filename)
     string line;
     getline(rand_file, line);
     int count = stoi(line);
-    for (int i = 0; i < count; i++)
-    {
+    for (int i = 0; i < count; i++) {
         getline(rand_file, line);
         RANDVALS[i] = stoi(line);
     }
@@ -571,25 +496,21 @@ void parse_randoms(char *filename)
  * Parse the process information from the input file
  * @param - filename - input file
  */
-void load_processes(char *filename)
-{
+void load_processes(char *filename) {
     fstream input_file;
 
     input_file.open(filename, ios::in);
 
-    if (!input_file.is_open())
-    {
+    if (!input_file.is_open()) {
         printf("Not a valid inputfile <%s>\n", filename);
         exit(1);
     }
 
     string line;
-    int c = 0;
-    while (getline(input_file, line))
-    {
-        Process *p = new Process(line);
+    while (getline(input_file, line)) {
+        auto *p = new Process(line);
         /** Initialize the static and dynamic priorities **/
-        p->static_priority = SCHEDULER ? myrandom(SCHEDULER->get_maxprio()) : myrandom(4);
+        p->static_priority = SCHEDULER ? get_random(SCHEDULER->get_maxprio()) : get_random(4);
         p->dynamic_priority = p->static_priority - 1;
         PROCESSES.push_back(p);
     }
@@ -598,12 +519,10 @@ void load_processes(char *filename)
 /**
  * Start simulation
  */
-void run_simulation()
-{
-    int iobusy_start_time = 0;
+void run_simulation() {
+    int io_busy_start_time = 0;
     Event *evt;
-    while ((evt = DISPATCHER->get_event()))
-    {
+    while ((evt = DISPATCHER->get_event())) {
         Process *proc = evt->process; // this is the process the event works on
         CURRENT_TIME = evt->timestamp;
         Transitions transition = evt->transition;
@@ -611,224 +530,191 @@ void run_simulation()
         delete evt;
         evt = nullptr; // remove cur event obj and don’t touch anymore
 
-        switch (transition)
-        {
-        case TRANS_TO_READY:
-        {
-            /** must come from BLOCKED or CREATED **/
-            if (proc->state != BLOCKED && proc->state != CREATED && proc->state != RUNNING)
-            {
-                printf("TRANS_TO_READY - Incorrect incoming state - %s, expected BLOCKED/CREATED/RUNNING\n", STATE_STRING[proc->state].c_str());
-                exit(1);
-            }
-
-            if (VERBOSE)
-                printf("%d %d %d: %s -> %s\n",
-                       CURRENT_TIME, proc->get_pid(), timeInPrevState,
-                       STATE_STRING[proc->state].c_str(), STATE_STRING[READY].c_str());
-            if (proc->state == BLOCKED)
-            {
-                /** perform accounting for BLOCKED to READY **/
-                proc->io_time += timeInPrevState;
-                BLOCKED_PROCESS_COUNT--;
-                if (BLOCKED_PROCESS_COUNT == 0)
-                {
-                    TIME_IO_BUSY += CURRENT_TIME - iobusy_start_time;
-                    iobusy_start_time = 0;
+        switch (transition) {
+            case TRANS_TO_READY: {
+                /** must come from BLOCKED or CREATED **/
+                if (proc->state != BLOCKED && proc->state != CREATED && proc->state != RUNNING) {
+                    printf("TRANS_TO_READY - Incorrect incoming state - %s, expected BLOCKED/CREATED/RUNNING\n",
+                           STATE_STRING[proc->state].c_str());
+                    exit(1);
                 }
-                // reset dynamic priority
-                proc->dynamic_priority = proc->static_priority - 1;
+
+                if (VERBOSE)
+                    printf("%d %d %d: %s -> %s\n",
+                           CURRENT_TIME, proc->get_pid(), timeInPrevState,
+                           STATE_STRING[proc->state].c_str(), STATE_STRING[READY].c_str());
+                if (proc->state == BLOCKED) {
+                    /** perform accounting for BLOCKED to READY **/
+                    proc->io_time += timeInPrevState;
+                    BLOCKED_PROCESS_COUNT--;
+                    if (BLOCKED_PROCESS_COUNT == 0) {
+                        TIME_IO_BUSY += CURRENT_TIME - io_busy_start_time;
+                        io_busy_start_time = 0;
+                    }
+                    // reset dynamic priority
+                    proc->dynamic_priority = proc->static_priority - 1;
+                }
+
+                /** add process to run queue, no event created **/
+                proc->state_start_time = CURRENT_TIME;
+                proc->state = READY;
+
+                SCHEDULER->add_process(proc);
+                CALL_SCHEDULER = true;
+                break;
             }
-
-            /** add process to run queue, no event created **/
-            proc->state_start_time = CURRENT_TIME;
-            proc->state = READY;
-
-            printf("Adding process pid = %d to scheduler (TRANS_TO_READY)\n", proc->get_pid());
-            SCHEDULER->add_process(proc);
-            CALL_SCHEDULER = true;
-            break;
-        }
-        case TRANS_TO_PREEMPT: // similar to TRANS_TO_READY
-        {
-            if (proc->state != RUNNING)
+            case TRANS_TO_PREEMPT: // similar to TRANS_TO_READY
             {
-                printf("TRANS_TO_PREEMPT - Incorrect incoming state - %s, expected RUNNING\n", STATE_STRING[proc->state].c_str());
-                exit(1);
+                if (proc->state != RUNNING) {
+                    printf("TRANS_TO_PREEMPT - Incorrect incoming state - %s, expected RUNNING\n",
+                           STATE_STRING[proc->state].c_str());
+                    exit(1);
+                }
+                /** perform accounting for RUNNING to PREEMPT **/
+                proc->remaining_cpu_time -= timeInPrevState;
+                proc->curr_cpu_burst -= timeInPrevState;
+
+                /** must come from RUNNING (preemption) **/
+                if (VERBOSE)
+                    printf("%d %d %d: %s -> %s  cb=%d rem=%d prio=%d\n",
+                           CURRENT_TIME, proc->get_pid(), timeInPrevState,
+                           STATE_STRING[proc->state].c_str(), STATE_STRING[READY].c_str(),
+                           proc->curr_cpu_burst, proc->remaining_cpu_time, proc->dynamic_priority);
+                if (proc == CURRENT_RUNNING_PROCESS) {
+                    CURRENT_RUNNING_PROCESS = nullptr;
+                }
+
+                /** add process to run queue, no event created **/
+                proc->dynamic_priority--;
+                proc->state_start_time = CURRENT_TIME;
+                proc->state = READY;
+
+                SCHEDULER->add_process(proc);
+                CALL_SCHEDULER = true;
+                break;
             }
-            /** perform accounting for RUNNING to PREEMPT **/
-            proc->remaining_cpu_time -= timeInPrevState;
-            proc->curr_cpu_burst -= timeInPrevState;
+            case TRANS_TO_RUN: {
+                if (proc->state != READY) {
+                    printf("TRANS_TO_RUN - Incorrect incoming state - %s, expected READY\n",
+                           STATE_STRING[proc->state].c_str());
+                    exit(1);
+                }
+                /** perform accounting READY to RUNNING **/
+                proc->cpu_wait_time += timeInPrevState;
 
-            /** must come from RUNNING (preemption) **/
-            if (VERBOSE)
-                printf("%d %d %d: %s -> %s  cb=%d rem=%d prio=%d\n",
-                       CURRENT_TIME, proc->get_pid(), timeInPrevState,
-                       STATE_STRING[proc->state].c_str(), STATE_STRING[READY].c_str(),
-                       proc->curr_cpu_burst, proc->remaining_cpu_time, proc->dynamic_priority);
-            if (proc == CURRENT_RUNNING_PROCESS)
-            {
+                /** calculations for new state **/
+                if (proc->curr_cpu_burst == 0) {
+                    int cb = get_random(proc->cpu_burst);
+                    if (proc->remaining_cpu_time < cb)
+                        cb = proc->remaining_cpu_time;
+                    proc->curr_cpu_burst = cb;
+                }
+                CURRENT_RUNNING_PROCESS = proc;
+
+                /** create event for either preemption or blocking */
+                if (SCHEDULER->get_quant() < proc->curr_cpu_burst) {
+                    /** create event for preemption **/
+                    auto *preempt_event = new Event(proc);
+                    preempt_event->timestamp = CURRENT_TIME + SCHEDULER->get_quant();
+                    preempt_event->transition = TRANS_TO_PREEMPT;
+                    DISPATCHER->put_event(preempt_event);
+                } else if (proc->curr_cpu_burst == proc->remaining_cpu_time) {
+                    /** create event for done **/
+                    auto *done_event = new Event(proc);
+                    done_event->timestamp = CURRENT_TIME + proc->curr_cpu_burst;
+                    done_event->transition = TRANS_TO_DONE;
+                    DISPATCHER->put_event(done_event);
+                } else {
+                    /** create event for blocking **/
+                    auto *block_event = new Event(proc);
+                    block_event->timestamp = CURRENT_TIME + proc->curr_cpu_burst;
+                    block_event->transition = TRANS_TO_BLOCK;
+                    DISPATCHER->put_event(block_event);
+                }
+
+                if (VERBOSE)
+                    printf("%d %d %d: %s -> %s cb=%d rem=%d prio=%d\n",
+                           CURRENT_TIME, proc->get_pid(), timeInPrevState,
+                           STATE_STRING[proc->state].c_str(), STATE_STRING[RUNNING].c_str(),
+                           proc->curr_cpu_burst, proc->remaining_cpu_time, proc->dynamic_priority);
+
+                proc->state_start_time = CURRENT_TIME;
+                proc->state = RUNNING;
+
+                CALL_SCHEDULER = true;
+                break;
+            }
+            case TRANS_TO_BLOCK: {
+                if (proc->state != RUNNING) {
+                    printf("TRANS_TO_BLOCK - Incorrect incoming state - %s, expected RUNNING\n",
+                           STATE_STRING[proc->state].c_str());
+                    exit(1);
+                }
+
+                /** perform accounting RUNNING to BLOCK **/
+                proc->remaining_cpu_time -= timeInPrevState;
+                proc->curr_cpu_burst = 0;
                 CURRENT_RUNNING_PROCESS = nullptr;
+
+                /** calculations for new state **/
+                int ib = get_random(proc->io_burst);
+                BLOCKED_PROCESS_COUNT++;
+                if (BLOCKED_PROCESS_COUNT == 1) {
+                    io_busy_start_time = CURRENT_TIME;
+                }
+
+                /** create an event for when process becomes READY again **/
+                auto *ready_event = new Event(proc);
+                ready_event->timestamp = CURRENT_TIME + ib;
+                ready_event->transition = TRANS_TO_READY;
+                DISPATCHER->put_event(ready_event);
+
+                if (VERBOSE)
+                    printf("%d %d %d: %s -> %s  ib=%d rem=%d\n",
+                           CURRENT_TIME, proc->get_pid(), timeInPrevState,
+                           STATE_STRING[proc->state].c_str(), STATE_STRING[BLOCKED].c_str(),
+                           ib, proc->remaining_cpu_time);
+
+                proc->state_start_time = CURRENT_TIME;
+                proc->state = BLOCKED;
+
+                CALL_SCHEDULER = true;
+                break;
             }
+            case TRANS_TO_DONE: {
+                if (proc->state != RUNNING) {
+                    printf("TRANS_TO_DONE - Incorrect incoming state - %s, expected RUNNING\n",
+                           STATE_STRING[proc->state].c_str());
+                    exit(1);
+                }
 
-            /** add process to run queue, no event created **/
-            proc->dynamic_priority--;
-            if (proc->dynamic_priority == -1)
-            {
-                proc->dynamic_priority = proc->static_priority - 1;
+                /** perform accounting RUNNING to DONE **/
+                proc->finishing_time = CURRENT_TIME;
+                CURRENT_RUNNING_PROCESS = nullptr;
+
+                if (VERBOSE)
+                    printf("%d %d %d: Done\n", CURRENT_TIME, proc->get_pid(), timeInPrevState);
+                CALL_SCHEDULER = true;
+                break;
             }
-            proc->state_start_time = CURRENT_TIME;
-            proc->state = READY;
-
-            printf("Adding process pid = %d to scheduler (TRANS_TO_PREEMPT)\n", proc->get_pid());
-            SCHEDULER->add_process(proc);
-            CALL_SCHEDULER = true;
-            break;
-        }
-        case TRANS_TO_RUN:
-        {
-            if (proc->state != READY)
-            {
-                printf("TRANS_TO_RUN - Incorrect incoming state - %s, expected READY\n", STATE_STRING[proc->state].c_str());
-                exit(1);
-            }
-            /** perform accounting READY to RUNNING **/
-            proc->cpu_wait_time += timeInPrevState;
-
-            /** calculations for new state **/
-            if (proc->curr_cpu_burst == 0)
-            {
-                int cb = myrandom(proc->cpu_burst);
-                if (proc->remaining_cpu_time < cb)
-                    cb = proc->remaining_cpu_time;
-                proc->curr_cpu_burst = cb;
-            }
-            CURRENT_RUNNING_PROCESS = proc;
-
-            /** create event for either preemption or blocking */
-            if (SCHEDULER->get_quant() < proc->curr_cpu_burst)
-            {
-                /** create event for preemption **/
-                Event *preempt_event = new Event(proc);
-                preempt_event->timestamp = CURRENT_TIME + SCHEDULER->get_quant();
-                preempt_event->transition = TRANS_TO_PREEMPT;
-                DISPATCHER->put_event(preempt_event);
-            }
-            else if (proc->curr_cpu_burst == proc->remaining_cpu_time)
-            {
-                /** create event for done **/
-                Event *done_event = new Event(proc);
-                done_event->timestamp = CURRENT_TIME + proc->curr_cpu_burst;
-                done_event->transition = TRANS_TO_DONE;
-                DISPATCHER->put_event(done_event);
-            }
-            else
-            {
-                /** create event for blocking **/
-                Event *block_event = new Event(proc);
-                block_event->timestamp = CURRENT_TIME + proc->curr_cpu_burst;
-                block_event->transition = TRANS_TO_BLOCK;
-                DISPATCHER->put_event(block_event);
-            }
-
-            if (VERBOSE)
-                printf("%d %d %d: %s -> %s cb=%d rem=%d prio=%d\n",
-                       CURRENT_TIME, proc->get_pid(), timeInPrevState,
-                       STATE_STRING[proc->state].c_str(), STATE_STRING[RUNNING].c_str(),
-                       proc->curr_cpu_burst, proc->remaining_cpu_time, proc->dynamic_priority);
-
-            proc->state_start_time = CURRENT_TIME;
-            proc->state = RUNNING;
-
-            CALL_SCHEDULER = true;
-            break;
-        }
-        case TRANS_TO_BLOCK:
-        {
-            if (proc->state != RUNNING)
-            {
-                printf("TRANS_TO_BLOCK - Incorrect incoming state - %s, expected RUNNING\n", STATE_STRING[proc->state].c_str());
-                exit(1);
-            }
-
-            /** perform accounting RUNNING to BLOCK **/
-            proc->remaining_cpu_time -= timeInPrevState;
-            proc->curr_cpu_burst = 0;
-            CURRENT_RUNNING_PROCESS = nullptr;
-
-            /** calculations for new state **/
-            int ib = myrandom(proc->io_burst);
-            BLOCKED_PROCESS_COUNT++;
-            if (BLOCKED_PROCESS_COUNT == 1)
-            {
-                iobusy_start_time = CURRENT_TIME;
-            }
-
-            /** create an event for when process becomes READY again **/
-            Event *ready_event = new Event(proc);
-            ready_event->timestamp = CURRENT_TIME + ib;
-            ready_event->transition = TRANS_TO_READY;
-            DISPATCHER->put_event(ready_event);
-
-            if (VERBOSE)
-                printf("%d %d %d: %s -> %s  ib=%d rem=%d\n",
-                       CURRENT_TIME, proc->get_pid(), timeInPrevState,
-                       STATE_STRING[proc->state].c_str(), STATE_STRING[BLOCKED].c_str(),
-                       ib, proc->remaining_cpu_time);
-
-            proc->state_start_time = CURRENT_TIME;
-            proc->state = BLOCKED;
-
-            CALL_SCHEDULER = true;
-            break;
-        }
-        case TRANS_TO_DONE:
-        {
-            if (proc->state != RUNNING)
-            {
-                printf("TRANS_TO_DONE - Incorrect incoming state - %s, expected RUNNING\n", STATE_STRING[proc->state].c_str());
-                exit(1);
-            }
-
-            /** perform accounting RUNNING to DONE **/
-            proc->finishing_time = CURRENT_TIME;
-            CURRENT_RUNNING_PROCESS = nullptr;
-
-            if (VERBOSE)
-                printf("%d %d %d: Done\n", CURRENT_TIME, proc->get_pid(), timeInPrevState);
-            CALL_SCHEDULER = true;
-            break;
-        }
         }
 
-        if (CALL_SCHEDULER)
-        {
+        if (CALL_SCHEDULER) {
             if (DISPATCHER->get_next_event_time() == CURRENT_TIME)
                 continue;           // process next event from Event queue
             CALL_SCHEDULER = false; // reset global flag
-            if (CURRENT_RUNNING_PROCESS == nullptr)
-            {
+            if (CURRENT_RUNNING_PROCESS == nullptr) {
                 CURRENT_RUNNING_PROCESS = SCHEDULER->get_next_process();
                 if (CURRENT_RUNNING_PROCESS == nullptr)
                     continue;
 
                 /** create event to make this process runnable for same time **/
-                Event *run_event = new Event(CURRENT_RUNNING_PROCESS);
+                auto *run_event = new Event(CURRENT_RUNNING_PROCESS);
                 run_event->timestamp = CURRENT_TIME;
                 run_event->transition = TRANS_TO_RUN;
                 DISPATCHER->put_event(run_event);
             }
         }
-
-        /**TODO - remove console logs **/
-        // cout << "####################################################################################\n";
-        // cout << "Current PID - " << CURRENT_RUNNING_PROCESS->get_pid() << endl;
-        // cout << "Current Event Queue\n";
-        // for (Event *e : DISPATCHER->eventQ)
-        // {
-        //     cout << "Event: " << e->process->get_pid() << " : " << e->timestamp << " : " << Transitions_Strings[e->transition] << endl;
-        // }
-        // cout << "####################################################################################\n";
     }
 }
 
@@ -838,53 +724,46 @@ void run_simulation()
  * @param - argc - total argument count
  * @param - argv - array of arguments
  */
-void read_arguments(int argc, char **argv)
-{
+void read_arguments(int argc, char **argv) {
     int option;
-    while ((option = getopt(argc, argv, "vtepis:")) != -1)
-    {
-        switch (option)
-        {
-        case 'v':
-            VERBOSE = true;
-            break;
-        case 't':
-            SHOW_SCHED_DETAILS = true;
-            break;
-        case 'e':
-            SHOW_EVENT_TRACE = true;
-            break;
-        case 'p':
-            SHOW_PREEMPTION_TRACE = true;
-            break;
-        case 'i':
-            SHOW_SINGLE_STEP = true;
-            break;
-        case 's':
-        {
-            SCHEDULER = getScheduler(optarg);
-            break;
-        }
-        default:
-            print_usage(argv[0]);
-            exit(1);
+    while ((option = getopt(argc, argv, "vtepis:")) != -1) {
+        switch (option) {
+            case 'v':
+                VERBOSE = true;
+                break;
+            case 't':
+                SHOW_SCHED_DETAILS = true;
+                break;
+            case 'e':
+                SHOW_EVENT_TRACE = true;
+                break;
+            case 'p':
+                SHOW_PREEMPTION_TRACE = true;
+                break;
+            case 'i':
+                SHOW_SINGLE_STEP = true;
+                break;
+            case 's': {
+                SCHEDULER = getScheduler(optarg);
+                break;
+            }
+            default:
+                print_usage(argv[0]);
+                exit(1);
         }
     }
 
-    if (argc == optind)
-    {
+    if (argc == optind) {
         printf("Not a valid inputfile <(null)>\n");
         exit(1);
     }
 
-    if (argc == optind + 1)
-    {
+    if (argc == optind + 1) {
         printf("Not a valid random file <(null)>\n");
         exit(1);
     }
 
-    if (!SCHEDULER)
-    {
+    if (!SCHEDULER) {
         SCHEDULER = new FCFSScheduler();
     }
 }
@@ -892,18 +771,16 @@ void read_arguments(int argc, char **argv)
 /**
  * Print the scheduling output in the format expected for grading
  */
-void print_output()
-{
+void print_output() {
     printf("%s\n", SCHEDULER->to_string().c_str());
 
-    int time_cpubusy = 0;
+    int time_cpu_busy = 0;
     int num_processes = 0;
     int total_turnaround = 0;
     int total_cpu_wait = 0;
-    int finishtime = CURRENT_TIME;
+    int finish_time = CURRENT_TIME;
 
-    for (Process *p : PROCESSES)
-    {
+    for (Process *p: PROCESSES) {
         int turnaround_time = p->finishing_time - p->arrival_time;
         printf("%04d: %4d %4d %4d %4d %1d | %5d %5d %5d %5d\n",
                p->get_pid(), p->arrival_time, p->total_cpu_time, p->cpu_burst, p->io_burst,
@@ -911,22 +788,21 @@ void print_output()
 
         total_turnaround += turnaround_time;
         total_cpu_wait += p->cpu_wait_time;
-        time_cpubusy += turnaround_time - p->io_time - p->cpu_wait_time;
+        time_cpu_busy += turnaround_time - p->io_time - p->cpu_wait_time;
         num_processes += 1;
     }
 
-    double cpu_util = 100.0 * (time_cpubusy / (double)finishtime);
-    double io_util = 100.0 * (TIME_IO_BUSY / (double)finishtime);
-    double avg_turnaround_time = (total_turnaround / (double)num_processes);
-    double avg_cpu_wait_time = (total_cpu_wait / (double)num_processes);
-    double throughput = 100.0 * (num_processes / (double)finishtime);
+    double cpu_util = 100.0 * (time_cpu_busy / (double) finish_time);
+    double io_util = 100.0 * (TIME_IO_BUSY / (double) finish_time);
+    double avg_turnaround_time = (total_turnaround / (double) num_processes);
+    double avg_cpu_wait_time = (total_cpu_wait / (double) num_processes);
+    double throughput = 100.0 * (num_processes / (double) finish_time);
 
     printf("SUM: %d %.2lf %.2lf %.2lf %.2lf %.3lf\n",
-           finishtime, cpu_util, io_util, avg_turnaround_time, avg_cpu_wait_time, throughput);
+           finish_time, cpu_util, io_util, avg_turnaround_time, avg_cpu_wait_time, throughput);
 }
 
-int main(int argc, char **argv)
-{
+int main(int argc, char **argv) {
     read_arguments(argc, argv);
     parse_randoms(argv[optind + 1]);
     load_processes(argv[optind]);
