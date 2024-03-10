@@ -59,6 +59,7 @@ public:
         strcpy(buffer, args.c_str());
 
         sscanf(buffer, "%d %d %d %d", &arrival_time, &total_cpu_time, &cpu_burst, &io_burst);
+        delete[] buffer;
 
         /** default initialization **/
         state = CREATED;
@@ -101,6 +102,8 @@ public:
     [[nodiscard]] int get_quant() const {
         return quantum;
     }
+
+    virtual ~Scheduler() = default;
 };
 
 class FCFSScheduler : public Scheduler {
@@ -279,11 +282,15 @@ public:
     string to_string() override {
         return "PRIO " + std::to_string(quantum);
     }
+
+    ~PriorityScheduler() override {
+        delete activeRunQ;
+        delete expiredRunQ;
+    }
 };
 
 class PreemptivePriorityScheduler : public Scheduler {
 private:
-    int count = 0;
     vector<deque<Process *>> *activeRunQ = new vector<deque<Process *>>;
     vector<deque<Process *>> *expiredRunQ = new vector<deque<Process *>>;
 
@@ -301,17 +308,26 @@ public:
             max_priority = 4;
 
         activeRunQ->resize(max_priority);
+        expiredRunQ->resize(max_priority);
     }
 
     void add_process(Process *p) override {
-        deque<Process *> *dq = &(*activeRunQ)[0];
-        dq->push_front(p);
 
-        count++;
-//        if (count == 150) {
-//            printf("Count Done\n");
-//            exit(1);
-//        }
+        int priority = p->dynamic_priority;
+
+        if (priority < 0) {
+            // add to expired queue
+            priority = p->static_priority - 1;
+            p->dynamic_priority = priority;
+            deque<Process *> *expired_q = &((*expiredRunQ)[priority]);
+            expired_q->push_front(p);
+
+            return;
+        }
+
+        // add to active queue
+        deque<Process *> *active_q = &(*activeRunQ)[priority];
+        active_q->push_front(p);
     }
 
     Process *get_next_process() override {
@@ -319,21 +335,34 @@ public:
             return nullptr;
         }
 
-        deque<Process *> *dq = &(*activeRunQ)[0];
-        Process *p = dq->back();
-        dq->pop_back();
+        if (is_empty(activeRunQ)) {
+            activeRunQ->swap(*expiredRunQ);
+        }
 
-        // helpline
-        count++;
-//        if (count == 150) {
-//            printf("Count Done\n");
-//            exit(1);
-//        }
-        return p;
+        deque<Process *> *highest_priority_q = nullptr;
+        for (int i = max_priority - 1; i >= 0; i--) {
+            if (!(*activeRunQ)[i].empty()) {
+                highest_priority_q = &((*activeRunQ)[i]);
+                break;
+            }
+        }
+
+        if (highest_priority_q) {
+            Process *p = highest_priority_q->back();
+            highest_priority_q->pop_back();
+            return p;
+        }
+
+        return nullptr;
     }
 
     string to_string() override {
         return "PREPRIO " + std::to_string(quantum);
+    }
+
+    ~PreemptivePriorityScheduler() override {
+        delete activeRunQ;
+        delete expiredRunQ;
     }
 };
 
@@ -408,7 +437,7 @@ map<Proc_State, string> STATE_STRING = {
         {Proc_State::CREATED, "CREATED"},
         {Proc_State::PREEMPT, "PREEMPT"},
         {Proc_State::READY,   "READY"},
-        {Proc_State::RUNNING, "RUNNG"}};        // convert enums to strings
+        {Proc_State::RUNNING, "RUNNG"}};      // convert enums to strings
 int RANDVALS[100000];                       // initialize a list of random numbers
 int OFS = 0;                                // line offset for the random file
 vector<Process *> PROCESSES;                // initialize a list of processes
@@ -854,6 +883,17 @@ void print_output() {
            finish_time, cpu_util, io_util, avg_turnaround_time, avg_cpu_wait_time, throughput);
 }
 
+/**
+ * Deallocate memory used in the program
+ */
+void garbage_collection() {
+    delete SCHEDULER;
+    delete DISPATCHER;
+
+    for (Process *p: PROCESSES)
+        delete p;
+}
+
 int main(int argc, char **argv) {
     read_arguments(argc, argv);
     parse_randoms(argv[optind + 1]);
@@ -864,4 +904,6 @@ int main(int argc, char **argv) {
     run_simulation();
 
     print_output();
+
+    garbage_collection();
 }
