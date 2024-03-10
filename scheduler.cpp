@@ -351,7 +351,7 @@ map<Proc_State, string> STATE_STRING = {
     {Proc_State::READY, "READY"},
     {Proc_State::RUNNING, "RUNNG"}}; // convert enums to strings
 
-/** TODO - DElete this **/
+/** TODO - Delete this **/
 map<Transitions, string> Transitions_Strings = {
     {Transitions::TRANS_TO_BLOCK, "TRANS_TO_BLOCK"},
     {Transitions::TRANS_TO_DONE, "TRANS_TO_DONE"},
@@ -363,11 +363,15 @@ int OFS = 0;                                      // line offset for the random 
 vector<Process *> PROCESSES;                      // initialize a list of processes
 int Process::process_count = 0;                   // set process count static data to 0
 int CURRENT_TIME = 0;                             // current CPU time
-bool CALL_SCHEDULER = false;
-Scheduler *SCHEDULER = nullptr;
-Process *CURRENT_RUNNING_PROCESS = nullptr;
-DES_Layer *DISPATCHER = nullptr;
-bool VERBOSE = false;
+int BLOCKED_PROCESS_COUNT = 0;                    // total number of blocked process at a particular time
+int TIME_IO_BUSY = 0;                             // time at least one process is performing IO
+bool CALL_SCHEDULER = false;                      // flag to call the next process in the scheduler
+Scheduler *SCHEDULER = nullptr;                   // Scheduler instance being used in simulation
+Process *CURRENT_RUNNING_PROCESS = nullptr;       // pointer to the current running process
+DES_Layer *DISPATCHER = nullptr;                  // DES Layer being used in the simulation
+bool VERBOSE = false;                             // flag to disply extra information for every event
+
+/** Not implemented these features **/
 bool SHOW_SCHED_DETAILS = false;
 bool SHOW_EVENT_TRACE = false;
 bool SHOW_PREEMPTION_TRACE = false;
@@ -538,6 +542,7 @@ void load_processes(char *filename)
  */
 void run_simulation()
 {
+    int iobusy_start_time = 0;
     Event *evt;
     while ((evt = DISPATCHER->get_event()))
     {
@@ -561,6 +566,12 @@ void run_simulation()
             {
                 /** perform accounting for BLOCKED to READY **/
                 proc->io_time += timeInPrevState;
+                BLOCKED_PROCESS_COUNT--;
+                if (BLOCKED_PROCESS_COUNT == 0)
+                {
+                    TIME_IO_BUSY += CURRENT_TIME - iobusy_start_time;
+                    iobusy_start_time = 0;
+                }
             }
 
             /** add process to run queue, no event created **/
@@ -654,6 +665,11 @@ void run_simulation()
 
             /** calculations for new state **/
             int ib = myrandom(proc->io_burst);
+            BLOCKED_PROCESS_COUNT++;
+            if (BLOCKED_PROCESS_COUNT == 1)
+            {
+                iobusy_start_time = CURRENT_TIME;
+            }
 
             /** create an event for when process becomes READY again **/
             Event *ready_event = new Event(proc);
@@ -782,7 +798,6 @@ void print_output()
     printf("%s\n", SCHEDULER->to_string().c_str());
 
     int time_cpubusy = 0;
-    int time_iobusy = 0;
     int num_processes = 0;
     int total_turnaround = 0;
     int total_cpu_wait = 0;
@@ -798,12 +813,11 @@ void print_output()
         total_turnaround += turnaround_time;
         total_cpu_wait += p->cpu_wait_time;
         time_cpubusy += turnaround_time - p->io_time - p->cpu_wait_time;
-        time_iobusy += p->io_time;
         num_processes += 1;
     }
 
     double cpu_util = 100.0 * (time_cpubusy / (double)finishtime);
-    double io_util = 100.0 * (time_iobusy / (double)finishtime);
+    double io_util = 100.0 * (TIME_IO_BUSY / (double)finishtime);
     double avg_turnaround_time = (total_turnaround / (double)num_processes);
     double avg_cpu_wait_time = (total_cpu_wait / (double)num_processes);
     double throughput = 100.0 * (num_processes / (double)finishtime);
