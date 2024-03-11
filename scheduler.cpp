@@ -19,14 +19,6 @@ enum Transitions {
     TRANS_TO_RUN,
 };
 
-/** TODO - Delete this **/
-map<Transitions, string> Transitions_Strings = {
-        {Transitions::TRANS_TO_BLOCK,   "TRANS_TO_BLOCK"},
-        {Transitions::TRANS_TO_DONE,    "TRANS_TO_DONE"},
-        {Transitions::TRANS_TO_PREEMPT, "TRANS_TO_PREEMPT"},
-        {Transitions::TRANS_TO_READY,   "TRANS_TO_READY"},
-        {Transitions::TRANS_TO_RUN,     "TRANS_TO_RUN"}}; // convert enums to strings
-
 enum Proc_State {
     BLOCKED,
     CREATED,
@@ -90,11 +82,9 @@ public:
 };
 
 class DES_Layer {
-    // private:
-
-public:
-    // TODO: Make member private
+private:
     deque<Event *> eventQ;
+public:
 
     /**
      * Add the created processes to the Event Queue
@@ -492,7 +482,6 @@ public:
 /**
  * Global variables
  */
-
 map<Proc_State, string> STATE_STRING = {
         {Proc_State::BLOCKED, "BLOCK"},
         {Proc_State::CREATED, "CREATED"},
@@ -672,8 +661,7 @@ void run_simulation() {
         CURRENT_TIME = evt->timestamp;
         Transitions transition = evt->transition;
         int timeInPrevState = CURRENT_TIME - proc->state_start_time; // for accounting
-        delete evt;
-        evt = nullptr; // remove cur event obj and don’t touch anymore
+        delete evt; // delete cur event obj and don’t touch anymore
 
         switch (transition) {
             case TRANS_TO_READY: {
@@ -758,7 +746,6 @@ void run_simulation() {
                     preprio_event->timestamp = CURRENT_TIME;
                     preprio_event->transition = TRANS_TO_PREEMPT;
                     DISPATCHER->put_event(preprio_event);
-
                 }
 
                 SCHEDULER->add_process(proc);
