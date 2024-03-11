@@ -499,7 +499,8 @@ map<Proc_State, string> STATE_STRING = {
         {Proc_State::PREEMPT, "PREEMPT"},
         {Proc_State::READY,   "READY"},
         {Proc_State::RUNNING, "RUNNG"}};      // convert enums to strings
-int RANDVALS[100000];                       // initialize a list of random numbers
+int RAND_COUNT = 0;                         // total number of random numbers in file
+vector<int> RANDVALS;                       // initialize a list of random numbers
 int OFS = 0;                                // line offset for the random file
 vector<Process *> PROCESSES;                // initialize a list of processes
 int Process::process_count = 0;             // set process count static data to 0
@@ -544,7 +545,8 @@ bool hasChar(const char *str, char ch) {
  * @returns - random value in the range of 1,..,burst
  */
 int get_random(int burst) {
-    int random = 1 + (RANDVALS[OFS] % burst);
+    int offset = OFS % RAND_COUNT;
+    int random = 1 + (RANDVALS[offset] % burst);
     OFS++;
     return random;
 }
@@ -587,8 +589,8 @@ Scheduler *getScheduler(char *args) {
             return new RRScheduler(quantum);
         }
         case 'P': {
-            int quantum;
-            int maxprio;
+            int quantum = 0;
+            int maxprio = 0;
             sscanf(args, "P%d:%d", &quantum, &maxprio);
             if (quantum <= 0 || (hasChar(args, ':') && maxprio <= 0)) {
                 printf("Invalid scheduler param <%s>\n", args);
@@ -597,8 +599,8 @@ Scheduler *getScheduler(char *args) {
             return new PriorityScheduler(quantum, maxprio);
         }
         case 'E': {
-            int quantum;
-            int maxprio;
+            int quantum = 0;
+            int maxprio = 0;
             sscanf(args, "E%d:%d", &quantum, &maxprio);
             if (quantum <= 0 || (hasChar(args, ':') && maxprio <= 0)) {
                 printf("Invalid scheduler param <%s>\n", args);
@@ -627,10 +629,11 @@ void parse_randoms(char *filename) {
 
     string line;
     getline(rand_file, line);
-    int count = stoi(line);
-    for (int i = 0; i < count; i++) {
+    RAND_COUNT = stoi(line);
+
+    for (int i = 0; i < RAND_COUNT; i++) {
         getline(rand_file, line);
-        RANDVALS[i] = stoi(line);
+        RANDVALS.push_back(stoi(line));
     }
 }
 
