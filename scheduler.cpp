@@ -150,6 +150,21 @@ public:
         }
         return false;
     }
+
+    void remove_events(Process *process, int now) {
+
+        auto itr = eventQ.begin();
+        while (itr != eventQ.end()) {
+            Event *e = *itr;
+            if (e->process->get_pid() == process->get_pid() && e->timestamp != now) {
+                itr = eventQ.erase(itr);
+                delete e;
+            } else {
+                // move to next element
+                ++itr;
+            }
+        }
+    }
 };
 
 class Scheduler {
@@ -688,6 +703,15 @@ void run_simulation() {
 
                 /** new process ready, preempt the current running process **/
                 if (SCHEDULER->test_preempt(proc, CURRENT_RUNNING_PROCESS, DISPATCHER, CURRENT_TIME)) {
+                    // remove the later events
+                    DISPATCHER->remove_events(CURRENT_RUNNING_PROCESS, CURRENT_TIME);
+
+                    // preempt the current running process
+                    Process *p = CURRENT_RUNNING_PROCESS;
+                    auto *preprio_event = new Event(p);
+                    preprio_event->timestamp = CURRENT_TIME;
+                    preprio_event->transition = TRANS_TO_PREEMPT;
+                    DISPATCHER->put_event(preprio_event);
                 }
 
                 SCHEDULER->add_process(proc);
@@ -722,6 +746,15 @@ void run_simulation() {
 
                 /** new process ready, preempt the current running process **/
                 if (SCHEDULER->test_preempt(proc, CURRENT_RUNNING_PROCESS, DISPATCHER, CURRENT_TIME)) {
+                    // remove the later events
+                    DISPATCHER->remove_events(CURRENT_RUNNING_PROCESS, CURRENT_TIME);
+
+                    // preempt the current running process
+                    Process *p = CURRENT_RUNNING_PROCESS;
+                    auto *preprio_event = new Event(p);
+                    preprio_event->timestamp = CURRENT_TIME;
+                    preprio_event->transition = TRANS_TO_PREEMPT;
+                    DISPATCHER->put_event(preprio_event);
 
                 }
 
